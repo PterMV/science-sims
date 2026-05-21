@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Force Vectors — Sim</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --surface-2: #f4f4f5;
+      --border: #e7e7ea;
+      --ink: #0a0a0a;
+      --ink-2: #3f3f46;
+      --ink-3: #71717a;
+      --ink-4: #a1a1aa;
+      --f1: #F97316;                  /* Dynamics unit orange */
+      --f2: oklch(0.55 0.18 250);     /* blue */
+      --f3: oklch(0.58 0.18 300);     /* violet */
+      --res: #0a0a0a;                 /* resultant: ink */
+      --comp: oklch(0.62 0.04 250);   /* component dashed */
+      --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--sans); background: var(--bg); color: var(--ink); font-size: 14px; -webkit-font-smoothing: antialiased; }
+
+    .sim { display: grid; grid-template-columns: 1fr 340px; height: 100vh; min-height: 600px; }
+    @media (max-width: 760px) {
+      .sim { grid-template-columns: 1fr; grid-template-rows: minmax(420px, 60vh) 1fr; min-height: 0; }
+      .panel { border-left: none; border-top: 1px solid var(--border); }
+    }
+
+    .stage { position: relative; background: linear-gradient(180deg, #f8f8fa 0%, #f0f0f3 100%); display: grid; grid-template-rows: 1fr auto; overflow: hidden; }
+
+    .scene { position: relative; padding: 18px 24px; border-bottom: 1px solid var(--border); background: #fff; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+    .scene-head { display: flex; align-items: baseline; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+    .scene-head .hint { color: var(--ink); font-weight: 500; font-size: 11.5px; }
+
+    .canvas-wrap { position: relative; flex: 1; min-height: 320px; background: var(--surface-2); border-radius: 10px; overflow: hidden; }
+    svg.canvas { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; }
+    .grid-line { stroke: rgba(0,0,0,0.05); stroke-width: 1; }
+    .grid-line.major { stroke: rgba(0,0,0,0.1); }
+    .axis { stroke: rgba(0,0,0,0.35); stroke-width: 1; }
+    .axis-label { fill: var(--ink-3); font-family: var(--mono); font-size: 10px; }
+    .axis-tick { stroke: rgba(0,0,0,0.25); stroke-width: 1; }
+    .axis-tick-label { fill: var(--ink-4); font-family: var(--mono); font-size: 9px; }
+
+    .obj { fill: var(--ink); stroke: #fff; stroke-width: 2; }
+    .obj-label { fill: var(--ink); font-family: var(--mono); font-size: 10.5px; font-weight: 500; }
+
+    .vec-shaft { stroke-width: 3.5; stroke-linecap: round; fill: none; cursor: grab; }
+    .vec-shaft.dragging { cursor: grabbing; }
+    .vec-shaft.ghost { opacity: 0.32; stroke-dasharray: 4 4; }
+    .vec-head-touch { fill: transparent; cursor: grab; }
+    .vec-head-touch.dragging { cursor: grabbing; }
+    .vec-tag {
+      font-family: var(--mono); font-size: 11px; font-weight: 600;
+      paint-order: stroke; stroke: #fff; stroke-width: 4; stroke-linejoin: round;
+    }
+    .vec-tag.f1 { fill: var(--f1); }
+    .vec-tag.f2 { fill: var(--f2); }
+    .vec-tag.f3 { fill: var(--f3); }
+    .vec-tag.res { fill: var(--res); }
+
+    .comp-line { stroke: var(--comp); stroke-width: 1.4; stroke-dasharray: 3 3; fill: none; }
+    .comp-cap { fill: var(--comp); }
+
+    .readout-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .readout {
+      padding: 10px 12px;
+      border-right: 1px solid var(--border);
+      text-align: center;
+    }
+    .readout:last-child { border-right: none; }
+    .readout-label { font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin-bottom: 2px; }
+    .readout-value { font-family: var(--mono); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .readout-value .u { font-weight: 400; color: var(--ink-3); font-size: 10.5px; margin-left: 2px; }
+
+    /* Equation strip */
+    .eq-strip {
+      padding: 12px 16px;
+      background: #fff;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px 22px;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--ink-2);
+      align-items: center;
+    }
+    .eq-strip strong { color: var(--ink); font-weight: 600; }
+    .eq-strip .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+    /* Panel */
+    .panel {
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      padding: 22px 22px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+    .panel-header h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.015em; }
+    .panel-header p { margin: 4px 0 0; font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+
+    .ctrl-group { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: var(--surface-2); border-radius: 10px; }
+    .ctrl-group-head { display: flex; align-items: center; gap: 8px; }
+    .ctrl-group-swatch { width: 12px; height: 12px; border-radius: 3px; }
+    .ctrl-group-label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); flex: 1; }
+    .ctrl-group-toggle { font-family: var(--mono); font-size: 10px; color: var(--ink-3); cursor: pointer; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); background: #fff; }
+    .ctrl-group-toggle.on { color: var(--ink); }
+    .ctrl-group.disabled { opacity: 0.5; }
+    .ctrl-group.disabled input[type="range"] { pointer-events: none; }
+
+    .ctrl { display: flex; flex-direction: column; gap: 5px; }
+    .ctrl-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; }
+    .ctrl-label { color: var(--ink-2); }
+    .ctrl-value { font-family: var(--mono); font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .ctrl-value .unit { color: var(--ink-3); margin-left: 2px; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 4px;
+      background: #fff;
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px;
+      background: var(--ink); border-radius: 50%;
+      border: 2px solid var(--surface);
+      box-shadow: 0 0 0 1px var(--border); cursor: grab;
+    }
+    input[type="range"].thumb-f1::-webkit-slider-thumb { background: var(--f1); }
+    input[type="range"].thumb-f2::-webkit-slider-thumb { background: var(--f2); }
+    input[type="range"].thumb-f3::-webkit-slider-thumb { background: var(--f3); }
+    input[type="range"]::-moz-range-thumb {
+      width: 16px; height: 16px;
+      background: var(--ink); border-radius: 50%;
+      border: 2px solid var(--surface);
+    }
+
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 9px 8px; border-radius: 8px;
+      font-size: 11.5px; font-weight: 500;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--ink); font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .btn:hover { background: var(--surface-2); }
+    .btn.primary { background: var(--ink); color: white; border-color: var(--ink); font-size: 13px; padding: 10px 12px; }
+    .btn.primary:hover { background: var(--ink-2); }
+
+    .seg {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface-2);
+    }
+    .seg button {
+      padding: 8px 6px;
+      font-family: var(--mono); font-size: 10.5px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      background: transparent; color: var(--ink-3);
+      border: none; cursor: pointer;
+      border-right: 1px solid var(--border);
+    }
+    .seg button:last-child { border-right: none; }
+    .seg button.on { background: #fff; color: var(--ink); }
+
+    .toggle { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--surface-2); border-radius: 8px; font-size: 12.5px; cursor: pointer; user-select: none; }
+    .toggle .switch { width: 32px; height: 18px; background: var(--border); border-radius: 999px; position: relative; transition: background 0.15s; }
+    .toggle .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: #fff; border-radius: 50%; transition: transform 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+    .toggle.on .switch { background: var(--ink); }
+    .toggle.on .switch::after { transform: translateX(14px); }
+
+    .tip {
+      background: var(--surface-2);
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--ink-2);
+      line-height: 1.55;
+      border-left: 3px solid var(--f1);
+    }
+    .tip strong { color: var(--ink); font-weight: 600; }
+    .tip code { font-family: var(--mono); background: #fff; padding: 1px 5px; border-radius: 3px; font-size: 11.5px; }
+  </style>
+</head>
+<body>
+  <div class="sim">
+    <div class="stage">
+      <div class="scene">
+        <div class="scene-head">
+          <span>Force vectors on a point object · drag arrowheads</span>
+          <span class="hint">|R| = <span id="r-magnitude">0.0</span> N @ <span id="r-angle">0°</span></span>
+        </div>
+
+        <div class="canvas-wrap">
+          <svg class="canvas" id="canvas" viewBox="-200 -150 400 300" preserveAspectRatio="xMidYMid meet">
+            <g id="grid"></g>
+            <g id="axes"></g>
+            <g id="components"></g>
+            <g id="vectors"></g>
+            <g id="parallelogram"></g>
+            <g id="tiptotail"></g>
+            <g id="object">
+              <circle cx="0" cy="0" r="5" class="obj"></circle>
+            </g>
+            <g id="labels"></g>
+          </svg>
+        </div>
+
+        <div class="readout-row">
+          <div class="readout">
+            <div class="readout-label">Resultant |R|</div>
+            <div class="readout-value"><span id="rmag-out">0.0</span><span class="u">N</span></div>
+          </div>
+          <div class="readout">
+            <div class="readout-label">Angle θ</div>
+            <div class="readout-value"><span id="rang-out">0.0</span><span class="u">°</span></div>
+          </div>
+          <div class="readout">
+            <div class="readout-label">R<sub>x</sub></div>
+            <div class="readout-value"><span id="rx-out">0.0</span><span class="u">N</span></div>
+          </div>
+          <div class="readout">
+            <div class="readout-label">R<sub>y</sub></div>
+            <div class="readout-value"><span id="ry-out">0.0</span><span class="u">N</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="eq-strip">
+        <span><strong>R<sub>x</sub></strong> = Σ F<sub>x</sub> = F·cos θ</span>
+        <span><strong>R<sub>y</sub></strong> = Σ F<sub>y</sub> = F·sin θ</span>
+        <span><strong>|R|</strong> = √(R<sub>x</sub>² + R<sub>y</sub>²)</span>
+        <span><strong>θ<sub>R</sub></strong> = atan2(R<sub>y</sub>, R<sub>x</sub>)</span>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-header">
+        <h2>Force Vectors</h2>
+        <p>Drag any arrowhead on the canvas, or use the sliders. The black arrow is the resultant <strong>R = F₁ + F₂ + F₃</strong>.</p>
+      </div>
+
+      <div class="ctrl-group" id="g-f1">
+        <div class="ctrl-group-head">
+          <span class="ctrl-group-swatch" style="background: var(--f1)"></span>
+          <span class="ctrl-group-label">Force F₁</span>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Magnitude</span>
+            <span class="ctrl-value"><span id="f1-mag-out">8.0</span><span class="unit">N</span></span>
+          </div>
+          <input type="range" id="f1-mag" class="thumb-f1" min="0" max="20" step="0.1" value="8" />
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Direction</span>
+            <span class="ctrl-value"><span id="f1-ang-out">0</span><span class="unit">°</span></span>
+          </div>
+          <input type="range" id="f1-ang" class="thumb-f1" min="-180" max="180" step="1" value="0" />
+        </div>
+      </div>
+
+      <div class="ctrl-group" id="g-f2">
+        <div class="ctrl-group-head">
+          <span class="ctrl-group-swatch" style="background: var(--f2)"></span>
+          <span class="ctrl-group-label">Force F₂</span>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Magnitude</span>
+            <span class="ctrl-value"><span id="f2-mag-out">6.0</span><span class="unit">N</span></span>
+          </div>
+          <input type="range" id="f2-mag" class="thumb-f2" min="0" max="20" step="0.1" value="6" />
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Direction</span>
+            <span class="ctrl-value"><span id="f2-ang-out">90</span><span class="unit">°</span></span>
+          </div>
+          <input type="range" id="f2-ang" class="thumb-f2" min="-180" max="180" step="1" value="90" />
+        </div>
+      </div>
+
+      <div class="ctrl-group disabled" id="g-f3">
+        <div class="ctrl-group-head">
+          <span class="ctrl-group-swatch" style="background: var(--f3)"></span>
+          <span class="ctrl-group-label">Force F₃</span>
+          <button class="ctrl-group-toggle" id="f3-toggle">off</button>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Magnitude</span>
+            <span class="ctrl-value"><span id="f3-mag-out">5.0</span><span class="unit">N</span></span>
+          </div>
+          <input type="range" id="f3-mag" class="thumb-f3" min="0" max="20" step="0.1" value="5" />
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Direction</span>
+            <span class="ctrl-value"><span id="f3-ang-out">-135</span><span class="unit">°</span></span>
+          </div>
+          <input type="range" id="f3-ang" class="thumb-f3" min="-180" max="180" step="1" value="-135" />
+        </div>
+      </div>
+
+      <div>
+        <div style="font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-4); margin-bottom: 6px;">Construction</div>
+        <div class="seg" id="method-seg">
+          <button data-method="none" class="on">Sum only</button>
+          <button data-method="parallel">Parallelogram</button>
+          <button data-method="tiptail">Tip-to-tail</button>
+        </div>
+      </div>
+
+      <div class="toggle on" id="components-toggle">
+        <span>Show components R<sub>x</sub>, R<sub>y</sub></span>
+        <span class="switch"></span>
+      </div>
+
+      <div>
+        <div style="font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-4); margin-bottom: 6px;">Scenarios</div>
+        <div class="btn-row">
+          <button class="btn" data-preset="perp">⊥ Perpendicular</button>
+          <button class="btn" data-preset="opposite">↔ Equal &amp; opposite</button>
+        </div>
+        <div class="btn-row" style="margin-top: 6px;">
+          <button class="btn" data-preset="balance">⚖ 3-force balance</button>
+          <button class="btn" data-preset="parallel">→ Parallel</button>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" id="reset-btn">↺ Reset</button>
+      </div>
+
+      <div class="tip">
+        <strong>Vector addition</strong>: forces add head-to-tail. The single arrow that replaces all of them is the <em>resultant</em>. When the resultant is zero the object is in <strong>equilibrium</strong>. Resolve each force into <code>Fx = F cos θ</code> and <code>Fy = F sin θ</code>, sum them, then recombine.
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const NS = "http://www.w3.org/2000/svg";
+    const $ = (id) => document.getElementById(id);
+
+    // ── Coordinate system ──
+    // viewBox is -200..200 (x) and -150..150 (y) in SVG units.
+    // SVG y is flipped: math up = SVG -y. We keep all math in standard
+    // physics coordinates (x right, y up, angle ccw from +x) and convert
+    // only when drawing.
+    const VIEW = { x: -200, y: -150, w: 400, h: 300 };
+    const PX_PER_N = 9; // 1 N = 9 SVG units of arrow length
+
+    function svgPoint(mx, my, svg) {
+      const pt = svg.createSVGPoint();
+      pt.x = mx; pt.y = my;
+      const ctm = svg.getScreenCTM().inverse();
+      const p = pt.matrixTransform(ctm);
+      return { x: p.x, y: -p.y }; // flip y back to math
+    }
+
+    // ── State ──
+    const state = {
+      forces: [
+        { id: "f1", enabled: true,  mag: 8, ang: 0,    color: "var(--f1)" },
+        { id: "f2", enabled: true,  mag: 6, ang: 90,   color: "var(--f2)" },
+        { id: "f3", enabled: false, mag: 5, ang: -135, color: "var(--f3)" },
+      ],
+      showComponents: true,
+      method: "none", // 'none' | 'parallel' | 'tiptail'
+    };
+
+    const getF = (id) => state.forces.find(f => f.id === id);
+
+    // ── Math helpers ──
+    const rad = (deg) => deg * Math.PI / 180;
+    const deg = (r) => r * 180 / Math.PI;
+    function components(f) {
+      return { x: f.mag * Math.cos(rad(f.ang)), y: f.mag * Math.sin(rad(f.ang)) };
+    }
+    function resultant() {
+      let x = 0, y = 0;
+      for (const f of state.forces) {
+        if (!f.enabled) continue;
+        const c = components(f);
+        x += c.x; y += c.y;
+      }
+      const mag = Math.hypot(x, y);
+      const ang = mag < 1e-6 ? 0 : deg(Math.atan2(y, x));
+      return { x, y, mag, ang };
+    }
+
+    // ── Drawing primitives ──
+    function clearGroup(id) { $(id).innerHTML = ""; }
+
+    function makeArrow(g, ox, oy, fx, fy, color, opts = {}) {
+      // physics-coord input; flip y for SVG.
+      const sox = ox, soy = -oy;
+      const sfx = fx, sfy = -fy;
+      const dx = sfx - sox, dy = sfy - soy;
+      const len = Math.hypot(dx, dy);
+      const headLen = Math.min(12, Math.max(6, len * 0.18));
+      const headW = headLen * 0.7;
+      // Pull shaft end back so it meets the arrowhead base, not the tip
+      const ux = len > 0 ? dx / len : 0;
+      const uy = len > 0 ? dy / len : 0;
+      const shaftEndX = sox + ux * Math.max(0, len - headLen * 0.85);
+      const shaftEndY = soy + uy * Math.max(0, len - headLen * 0.85);
+
+      const shaft = document.createElementNS(NS, "line");
+      shaft.setAttribute("x1", sox); shaft.setAttribute("y1", soy);
+      shaft.setAttribute("x2", shaftEndX); shaft.setAttribute("y2", shaftEndY);
+      shaft.setAttribute("stroke", color);
+      shaft.setAttribute("class", "vec-shaft" + (opts.ghost ? " ghost" : ""));
+      shaft.setAttribute("stroke-width", opts.width || 3.5);
+      if (opts.dashed) shaft.setAttribute("stroke-dasharray", "5 4");
+      g.appendChild(shaft);
+
+      // Arrowhead triangle
+      if (len > 1) {
+        const perpX = -uy, perpY = ux;
+        const baseX = sox + ux * len, baseY = soy + uy * len;
+        const backX = sox + ux * (len - headLen), backY = soy + uy * (len - headLen);
+        const p1 = `${baseX},${baseY}`;
+        const p2 = `${backX + perpX * headW / 2},${backY + perpY * headW / 2}`;
+        const p3 = `${backX - perpX * headW / 2},${backY - perpY * headW / 2}`;
+        const tri = document.createElementNS(NS, "polygon");
+        tri.setAttribute("points", `${p1} ${p2} ${p3}`);
+        tri.setAttribute("fill", color);
+        if (opts.ghost) tri.setAttribute("opacity", "0.32");
+        g.appendChild(tri);
+      }
+
+      // Touch target for dragging arrowhead
+      if (opts.draggable) {
+        const touch = document.createElementNS(NS, "circle");
+        touch.setAttribute("cx", sox + ux * len);
+        touch.setAttribute("cy", soy + uy * len);
+        touch.setAttribute("r", 14);
+        touch.setAttribute("class", "vec-head-touch");
+        touch.dataset.id = opts.id;
+        g.appendChild(touch);
+      }
+      return { tipX: sox + ux * len, tipY: soy + uy * len };
+    }
+
+    function addLabel(g, x, y, text, klass) {
+      const t = document.createElementNS(NS, "text");
+      t.setAttribute("x", x); t.setAttribute("y", -y);
+      t.setAttribute("class", "vec-tag " + klass);
+      t.setAttribute("dominant-baseline", "middle");
+      t.setAttribute("text-anchor", "middle");
+      t.textContent = text;
+      g.appendChild(t);
+    }
+
+    // ── Build grid + axes ──
+    function buildGrid() {
+      const g = $("grid"); g.innerHTML = "";
+      const a = $("axes"); a.innerHTML = "";
+      // 20-unit grid
+      for (let x = VIEW.x; x <= VIEW.x + VIEW.w; x += 20) {
+        const l = document.createElementNS(NS, "line");
+        l.setAttribute("x1", x); l.setAttribute("x2", x);
+        l.setAttribute("y1", VIEW.y); l.setAttribute("y2", VIEW.y + VIEW.h);
+        l.setAttribute("class", "grid-line" + (x % 60 === 0 ? " major" : ""));
+        g.appendChild(l);
+      }
+      for (let y = VIEW.y; y <= VIEW.y + VIEW.h; y += 20) {
+        const l = document.createElementNS(NS, "line");
+        l.setAttribute("x1", VIEW.x); l.setAttribute("x2", VIEW.x + VIEW.w);
+        l.setAttribute("y1", y); l.setAttribute("y2", y);
+        l.setAttribute("class", "grid-line" + (y % 60 === 0 ? " major" : ""));
+        g.appendChild(l);
+      }
+      // Axes
+      const ax = document.createElementNS(NS, "line");
+      ax.setAttribute("x1", VIEW.x); ax.setAttribute("x2", VIEW.x + VIEW.w);
+      ax.setAttribute("y1", 0); ax.setAttribute("y2", 0);
+      ax.setAttribute("class", "axis");
+      a.appendChild(ax);
+      const ay = document.createElementNS(NS, "line");
+      ay.setAttribute("x1", 0); ay.setAttribute("x2", 0);
+      ay.setAttribute("y1", VIEW.y); ay.setAttribute("y2", VIEW.y + VIEW.h);
+      ay.setAttribute("class", "axis");
+      a.appendChild(ay);
+      // Axis labels
+      const xL = document.createElementNS(NS, "text");
+      xL.setAttribute("x", VIEW.x + VIEW.w - 8); xL.setAttribute("y", -6);
+      xL.setAttribute("text-anchor", "end");
+      xL.setAttribute("class", "axis-label");
+      xL.textContent = "+x";
+      a.appendChild(xL);
+      const yL = document.createElementNS(NS, "text");
+      yL.setAttribute("x", 6); yL.setAttribute("y", VIEW.y + 12);
+      yL.setAttribute("class", "axis-label");
+      yL.textContent = "+y";
+      a.appendChild(yL);
+
+      // Tick labels every 5 N along +x as scale reference
+      for (let n = 5; n <= 20; n += 5) {
+        const sx = n * PX_PER_N;
+        if (sx > VIEW.x + VIEW.w - 6) break;
+        const t = document.createElementNS(NS, "line");
+        t.setAttribute("x1", sx); t.setAttribute("x2", sx);
+        t.setAttribute("y1", -2); t.setAttribute("y2", 2);
+        t.setAttribute("class", "axis-tick");
+        a.appendChild(t);
+        const lbl = document.createElementNS(NS, "text");
+        lbl.setAttribute("x", sx); lbl.setAttribute("y", 12);
+        lbl.setAttribute("text-anchor", "middle");
+        lbl.setAttribute("class", "axis-tick-label");
+        lbl.textContent = n + "N";
+        a.appendChild(lbl);
+      }
+    }
+
+    // ── Render forces, resultant, components, construction ──
+    function renderCanvas() {
+      const vg = $("vectors"); vg.innerHTML = "";
+      const lg = $("labels"); lg.innerHTML = "";
+      const cg = $("components"); cg.innerHTML = "";
+      const pg = $("parallelogram"); pg.innerHTML = "";
+      const tg = $("tiptotail"); tg.innerHTML = "";
+
+      // Tip-to-tail ghost arrows
+      if (state.method === "tiptail") {
+        let cx = 0, cy = 0;
+        const klass = ["f1", "f2", "f3"];
+        for (let i = 0; i < state.forces.length; i++) {
+          const f = state.forces[i];
+          if (!f.enabled) continue;
+          const c = components(f);
+          const colorVar = `var(--${f.id})`;
+          makeArrow(tg, cx, cy, cx + c.x * PX_PER_N, cy + c.y * PX_PER_N, colorVar, { ghost: true, width: 2.5 });
+          cx += c.x * PX_PER_N; cy += c.y * PX_PER_N;
+        }
+      }
+
+      // Parallelogram for first two enabled forces
+      if (state.method === "parallel") {
+        const enabled = state.forces.filter(f => f.enabled);
+        if (enabled.length >= 2) {
+          const a = components(enabled[0]);
+          const b = components(enabled[1]);
+          const ax = a.x * PX_PER_N, ay = a.y * PX_PER_N;
+          const bx = b.x * PX_PER_N, by = b.y * PX_PER_N;
+          // Two parallel sides
+          const seg1 = document.createElementNS(NS, "line");
+          seg1.setAttribute("x1", ax); seg1.setAttribute("y1", -ay);
+          seg1.setAttribute("x2", ax + bx); seg1.setAttribute("y2", -(ay + by));
+          seg1.setAttribute("stroke", `var(--${enabled[1].id})`);
+          seg1.setAttribute("stroke-width", "1.5");
+          seg1.setAttribute("stroke-dasharray", "4 3");
+          seg1.setAttribute("opacity", "0.55");
+          pg.appendChild(seg1);
+          const seg2 = document.createElementNS(NS, "line");
+          seg2.setAttribute("x1", bx); seg2.setAttribute("y1", -by);
+          seg2.setAttribute("x2", ax + bx); seg2.setAttribute("y2", -(ay + by));
+          seg2.setAttribute("stroke", `var(--${enabled[0].id})`);
+          seg2.setAttribute("stroke-width", "1.5");
+          seg2.setAttribute("stroke-dasharray", "4 3");
+          seg2.setAttribute("opacity", "0.55");
+          pg.appendChild(seg2);
+        }
+      }
+
+      // Each force arrow (from origin, in current math coords)
+      for (const f of state.forces) {
+        if (!f.enabled || f.mag < 0.05) continue;
+        const c = components(f);
+        const fx = c.x * PX_PER_N, fy = c.y * PX_PER_N;
+        const colorVar = `var(--${f.id})`;
+        const r = makeArrow(vg, 0, 0, fx, fy, colorVar, { draggable: true, id: f.id });
+        // Label slightly past tip, offset perpendicular to avoid overlap
+        const len = Math.hypot(fx, fy);
+        if (len > 4) {
+          const ux = fx / len, uy = fy / len;
+          const lx = fx + ux * 14 - uy * 4;
+          const ly = fy + uy * 14 + ux * 4;
+          addLabel(lg, lx, ly, f.id.toUpperCase().replace("F", "F"), f.id);
+        }
+      }
+
+      // Resultant
+      const R = resultant();
+      if (R.mag > 0.05) {
+        const fx = R.x * PX_PER_N, fy = R.y * PX_PER_N;
+        makeArrow(vg, 0, 0, fx, fy, "var(--res)", { width: 4 });
+        const len = Math.hypot(fx, fy);
+        const ux = fx / len, uy = fy / len;
+        addLabel(lg, fx + ux * 16 + uy * 6, fy + uy * 16 - ux * 6, "R", "res");
+      }
+
+      // Components of resultant
+      if (state.showComponents && R.mag > 0.05) {
+        const rx = R.x * PX_PER_N, ry = R.y * PX_PER_N;
+        // horizontal leg
+        const h = document.createElementNS(NS, "line");
+        h.setAttribute("x1", 0); h.setAttribute("y1", 0);
+        h.setAttribute("x2", rx); h.setAttribute("y2", 0);
+        h.setAttribute("class", "comp-line");
+        cg.appendChild(h);
+        // vertical leg
+        const v = document.createElementNS(NS, "line");
+        v.setAttribute("x1", rx); v.setAttribute("y1", 0);
+        v.setAttribute("x2", rx); v.setAttribute("y2", -ry);
+        v.setAttribute("class", "comp-line");
+        cg.appendChild(v);
+        // little labels
+        if (Math.abs(rx) > 12) {
+          const t = document.createElementNS(NS, "text");
+          t.setAttribute("x", rx / 2); t.setAttribute("y", 14);
+          t.setAttribute("text-anchor", "middle");
+          t.setAttribute("class", "axis-tick-label");
+          t.textContent = "Rx";
+          cg.appendChild(t);
+        }
+        if (Math.abs(ry) > 12) {
+          const t = document.createElementNS(NS, "text");
+          t.setAttribute("x", rx + (rx >= 0 ? 8 : -8));
+          t.setAttribute("y", -ry / 2);
+          t.setAttribute("text-anchor", rx >= 0 ? "start" : "end");
+          t.setAttribute("class", "axis-tick-label");
+          t.setAttribute("dominant-baseline", "middle");
+          t.textContent = "Ry";
+          cg.appendChild(t);
+        }
+      }
+
+      // Readouts
+      $("rmag-out").textContent = R.mag.toFixed(1);
+      $("rang-out").textContent = R.ang.toFixed(1);
+      $("rx-out").textContent = R.x.toFixed(1);
+      $("ry-out").textContent = R.y.toFixed(1);
+      $("r-magnitude").textContent = R.mag.toFixed(1);
+      $("r-angle").textContent = R.ang.toFixed(0) + "°";
+    }
+
+    // ── Sync sliders & state ──
+    function syncForceUI(f) {
+      $(`${f.id}-mag-out`).textContent = f.mag.toFixed(1);
+      $(`${f.id}-ang-out`).textContent = Math.round(f.ang);
+      $(`${f.id}-mag`).value = f.mag;
+      $(`${f.id}-ang`).value = f.ang;
+    }
+
+    function render() {
+      for (const f of state.forces) syncForceUI(f);
+      $("g-f3").classList.toggle("disabled", !getF("f3").enabled);
+      $("f3-toggle").classList.toggle("on", getF("f3").enabled);
+      $("f3-toggle").textContent = getF("f3").enabled ? "on" : "off";
+      $("components-toggle").classList.toggle("on", state.showComponents);
+      document.querySelectorAll("#method-seg button").forEach(b => {
+        b.classList.toggle("on", b.dataset.method === state.method);
+      });
+      renderCanvas();
+    }
+
+    // ── Drag interaction ──
+    let dragging = null;
+    const svg = $("canvas");
+
+    function onPointerDown(e) {
+      const target = e.target.closest(".vec-head-touch");
+      if (!target) return;
+      dragging = target.dataset.id;
+      target.classList.add("dragging");
+      svg.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    }
+    function onPointerMove(e) {
+      if (!dragging) return;
+      const f = getF(dragging);
+      const p = svgPoint(e.clientX, e.clientY, svg);
+      // Convert SVG-units position back to physics N
+      const mag = Math.hypot(p.x, p.y) / PX_PER_N;
+      let ang = deg(Math.atan2(p.y, p.x));
+      f.mag = Math.max(0, Math.min(20, mag));
+      f.ang = Math.max(-180, Math.min(180, ang));
+      render();
+    }
+    function onPointerUp(e) {
+      if (!dragging) return;
+      document.querySelectorAll(".vec-head-touch.dragging").forEach(n => n.classList.remove("dragging"));
+      dragging = null;
+    }
+    svg.addEventListener("pointerdown", onPointerDown);
+    svg.addEventListener("pointermove", onPointerMove);
+    svg.addEventListener("pointerup", onPointerUp);
+    svg.addEventListener("pointercancel", onPointerUp);
+
+    // ── Slider bindings ──
+    ["f1", "f2", "f3"].forEach(id => {
+      $(`${id}-mag`).addEventListener("input", (e) => {
+        getF(id).mag = parseFloat(e.target.value); render();
+      });
+      $(`${id}-ang`).addEventListener("input", (e) => {
+        getF(id).ang = parseFloat(e.target.value); render();
+      });
+    });
+
+    $("f3-toggle").addEventListener("click", () => {
+      const f = getF("f3");
+      f.enabled = !f.enabled;
+      render();
+    });
+
+    $("components-toggle").addEventListener("click", () => {
+      state.showComponents = !state.showComponents;
+      render();
+    });
+
+    document.querySelectorAll("#method-seg button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.method = btn.dataset.method;
+        render();
+      });
+    });
+
+    // ── Scenarios ──
+    function applyPreset(name) {
+      const f1 = getF("f1"), f2 = getF("f2"), f3 = getF("f3");
+      if (name === "perp") {
+        f1.mag = 8; f1.ang = 0; f1.enabled = true;
+        f2.mag = 6; f2.ang = 90; f2.enabled = true;
+        f3.enabled = false;
+        state.method = "parallel";
+      } else if (name === "opposite") {
+        f1.mag = 7; f1.ang = 0;   f1.enabled = true;
+        f2.mag = 7; f2.ang = 180; f2.enabled = true;
+        f3.enabled = false;
+        state.method = "tiptail";
+      } else if (name === "balance") {
+        // Three 120°-apart equal forces ⇒ zero resultant
+        f1.mag = 6; f1.ang = 90;   f1.enabled = true;
+        f2.mag = 6; f2.ang = -30;  f2.enabled = true;
+        f3.mag = 6; f3.ang = -150; f3.enabled = true;
+        state.method = "tiptail";
+      } else if (name === "parallel") {
+        f1.mag = 5; f1.ang = 0; f1.enabled = true;
+        f2.mag = 4; f2.ang = 0; f2.enabled = true;
+        f3.enabled = false;
+        state.method = "tiptail";
+      }
+      render();
+    }
+    document.querySelectorAll("[data-preset]").forEach(btn => {
+      btn.addEventListener("click", () => applyPreset(btn.dataset.preset));
+    });
+
+    $("reset-btn").addEventListener("click", () => {
+      const init = [
+        { id: "f1", enabled: true,  mag: 8, ang: 0 },
+        { id: "f2", enabled: true,  mag: 6, ang: 90 },
+        { id: "f3", enabled: false, mag: 5, ang: -135 },
+      ];
+      for (let i = 0; i < state.forces.length; i++) Object.assign(state.forces[i], init[i]);
+      state.method = "none";
+      state.showComponents = true;
+      render();
+    });
+
+    // ── Init ──
+    buildGrid();
+    render();
+  </script>
+</body>
+</html>

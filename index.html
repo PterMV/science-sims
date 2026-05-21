@@ -1,0 +1,370 @@
+// Science Interactive Simulation — content data
+// Each subject has 3 year levels (Y11/Y12/Y13). Each year level has chapters from
+// the textbook ToC, each containing sims. Only a few are flagged ready=true.
+
+window.SIM_DATA = {
+  subjects: [
+    {
+      id: "physics",
+      name: "Physics",
+      name_lo: "ຟີຊິກສາດ",
+      glyph: "Ph",
+      tagline: "Motion, energy, waves, fields.",
+      tagline_lo: "ການເຄື່ອນໄຫວ · ພັງງານ · ຄລື່ນ · ສະຫວັດ.",
+      desc: "Mechanics through electromagnetism, modeled with live parameters.",
+      years: {
+        y11: {
+          label: "Year 11",
+          subtitle: "Foundations of mechanics and energy",
+          chapters: [
+            {
+              num: "01", title: "Kinematics in one dimension",
+              sims: [
+                { id: "projectile-motion", title: "Projectile Motion", desc: "Launch angle, velocity and air drag against a parabolic trajectory.", ready: true, file: "sims/projectile-motion.html" },
+                { id: "velocity-time", title: "Velocity–Time Grapher", desc: "Drag a position slider and watch v(t) and a(t) build live." },
+                { id: "free-fall", title: "Free Fall on Other Worlds", desc: "Compare gravitational acceleration across planets and moons." },
+              ],
+            },
+            {
+              num: "02", title: "Forces and Newton's laws",
+              sims: [
+                { id: "incline-block", title: "Block on an Incline", desc: "Adjust angle and friction to resolve forces along and normal to the slope." },
+                { id: "tension-pulley", title: "Atwood Machine", desc: "Two masses over a frictionless pulley with adjustable inertia." },
+              ],
+            },
+            {
+              num: "03", title: "Work, energy and power",
+              sims: [
+                { id: "roller-coaster", title: "Energy Skate Park", desc: "Track PE and KE along an editable track with friction toggle." },
+                { id: "spring-pe", title: "Spring Potential", desc: "Hooke's law and elastic energy via interactive compression." },
+              ],
+            },
+          ],
+        },
+        y12: {
+          label: "Year 12",
+          subtitle: "Waves, fields and circular motion",
+          chapters: [
+            {
+              num: "01", title: "Circular motion and gravitation",
+              sims: [
+                { id: "orbit-sim", title: "Two-Body Orbits", desc: "Set initial velocity to trace ellipses, escape, or capture." },
+                { id: "centripetal", title: "Centripetal Force", desc: "Vary mass, radius and frequency to feel the inverse-square pull." },
+              ],
+            },
+            {
+              num: "02", title: "Simple harmonic motion",
+              sims: [
+                { id: "pendulum", title: "Damped Pendulum", desc: "Amplitude decay under air resistance and varying gravity." },
+                { id: "mass-spring", title: "Mass on a Spring", desc: "Compare phase, energy and resonance under forced driving." },
+              ],
+            },
+            {
+              num: "03", title: "Waves and superposition",
+              sims: [
+                { id: "wave-on-string", title: "Wave on a String", desc: "Pulse, oscillate, or send manual signals through fixed/free ends." },
+                { id: "interference", title: "Double-Slit Interference", desc: "Slit spacing and wavelength controlling fringe pattern." },
+              ],
+            },
+            {
+              num: "04", title: "Electric fields and circuits",
+              sims: [
+                { id: "field-lines", title: "Electric Field Mapper", desc: "Drag point charges and visualise vector field and equipotentials." },
+                { id: "circuit-kit", title: "DC Circuit Kit", desc: "Series, parallel, ammeters and voltmeters with live readouts." },
+              ],
+            },
+          ],
+        },
+        y13: {
+          label: "Year 13",
+          subtitle: "Modern physics and electromagnetism",
+          chapters: [
+            {
+              num: "01", title: "Electromagnetic induction",
+              sims: [
+                { id: "induction-loop", title: "Faraday's Loop", desc: "Move a magnet through a coil and watch induced EMF." },
+                { id: "transformer", title: "Transformer", desc: "Turn ratios, flux linkage, primary/secondary current." },
+              ],
+            },
+            {
+              num: "02", title: "Quantum phenomena",
+              sims: [
+                { id: "photoelectric", title: "Photoelectric Effect", desc: "Vary wavelength and intensity to find the work function." },
+                { id: "atom-spectra", title: "Hydrogen Spectrum", desc: "Energy-level transitions producing visible series lines." },
+              ],
+            },
+            {
+              num: "03", title: "Nuclear physics",
+              sims: [
+                { id: "decay-chain", title: "Radioactive Decay", desc: "Sample N(t) statistics for short and long half-lives." },
+                { id: "binding-energy", title: "Binding Energy Curve", desc: "Plot binding energy per nucleon across the chart of nuclides." },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      id: "chemistry",
+      name: "Chemistry",
+      name_lo: "ເຄມີສາດ",
+      glyph: "Ch",
+      tagline: "Bonds, reactions, equilibria.",
+      tagline_lo: "ພັນຘະ · ປະຕິກິລິຍາ · ສມດຸນ.",
+      desc: "From the periodic table through organic mechanisms, made tangible.",
+      years: {
+        y11: {
+          label: "Year 11",
+          subtitle: "Atomic structure and stoichiometry",
+          chapters: [
+            {
+              num: "01", title: "Atoms, ions and the periodic table",
+              sims: [
+                { id: "build-atom", title: "Build an Atom", desc: "Add protons, neutrons, electrons; watch element, mass and charge update." },
+                { id: "isotope-mix", title: "Isotope Abundance", desc: "Mix isotopes to derive a relative atomic mass." },
+              ],
+            },
+            {
+              num: "02", title: "Bonding and structure",
+              sims: [
+                { id: "lewis-structures", title: "Lewis Structure Builder", desc: "Drag electron pairs to construct covalent and dative bonds." },
+                { id: "molecular-shapes", title: "VSEPR Shapes", desc: "Add bonding and lone pairs to predict 3D geometry." },
+              ],
+            },
+            {
+              num: "03", title: "Moles and stoichiometry",
+              sims: [
+                { id: "balance-eqn", title: "Equation Balancer", desc: "Coefficient sliders verify atom counts in real time." },
+                { id: "limiting-reagent", title: "Limiting Reagent Lab", desc: "Mix reactant amounts to find the bottleneck and yield." },
+              ],
+            },
+          ],
+        },
+        y12: {
+          label: "Year 12",
+          subtitle: "Reactions, energetics and equilibrium",
+          chapters: [
+            {
+              num: "01", title: "Energetics and thermochemistry",
+              sims: [
+                { id: "enthalpy", title: "Reaction Enthalpy", desc: "Hess cycles built from bond enthalpies and calorimetry data." },
+                { id: "calorimeter", title: "Coffee-Cup Calorimeter", desc: "Drop salts of variable ΔH into water; record temperature curve." },
+              ],
+            },
+            {
+              num: "02", title: "Rates of reaction",
+              sims: [
+                { id: "rate-collision", title: "Collision Theory", desc: "Temperature and concentration affecting frequency and energy." },
+                { id: "catalyst", title: "Catalysed Pathway", desc: "Toggle a catalyst to redraw the activation-energy profile." },
+              ],
+            },
+            {
+              num: "03", title: "Chemical equilibrium",
+              sims: [
+                { id: "le-chatelier", title: "Le Chatelier's Principle", desc: "Pressure, temperature and concentration shifts on N₂ + 3H₂ ⇌ 2NH₃." },
+                { id: "kc-finder", title: "Equilibrium Constant", desc: "Run a reversible reaction to convergence and read off Kc." },
+              ],
+            },
+            {
+              num: "04", title: "Acids, bases and pH",
+              sims: [
+                { id: "titration", title: "Acid–Base Titration", desc: "Strong/weak combinations with live pH curve and indicator colour." },
+                { id: "buffer", title: "Buffer Builder", desc: "Compose buffers and test pH change against added acid/base." },
+              ],
+            },
+          ],
+        },
+        y13: {
+          label: "Year 13",
+          subtitle: "Organic and analytical chemistry",
+          chapters: [
+            {
+              num: "01", title: "Organic reactions and mechanisms",
+              sims: [
+                { id: "sn1-sn2", title: "SN1 vs SN2", desc: "Substrate, nucleophile and solvent steer the mechanism." },
+                { id: "addition-elim", title: "Addition / Elimination", desc: "Conditions toggle between Markovnikov and anti-Markovnikov." },
+              ],
+            },
+            {
+              num: "02", title: "Electrochemistry",
+              sims: [
+                { id: "galvanic", title: "Galvanic Cell", desc: "Half-cell selector computes EMF from standard potentials." },
+                { id: "electrolysis", title: "Electrolysis", desc: "Faraday's laws: charge, mass deposited and electrode reactions." },
+              ],
+            },
+            {
+              num: "03", title: "Spectroscopy",
+              sims: [
+                { id: "ir-spectra", title: "IR Fingerprints", desc: "Pick functional groups and read characteristic absorbances." },
+                { id: "nmr-basics", title: "¹H NMR Basics", desc: "Predict chemical shift, splitting and integration from structure." },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      id: "biology",
+      name: "Biology",
+      name_lo: "ຊີວະສາດ",
+      glyph: "Bi",
+      tagline: "Cells, systems, ecosystems.",
+      tagline_lo: "ເຊລລ່ · ລະບົບ · ນິເວດກໃນຘຳມະຊາດ.",
+      desc: "Living-system mechanics from molecular biology up to ecology.",
+      years: {
+        y11: {
+          label: "Year 11",
+          subtitle: "Cells, genes and inheritance",
+          chapters: [
+            {
+              num: "01", title: "Cell structure and transport",
+              sims: [
+                { id: "membrane-transport", title: "Membrane Transport", desc: "Diffusion, osmosis and active transport across a bilayer." },
+                { id: "cell-tour", title: "Animal vs Plant Cell", desc: "Click organelles to inspect structure and function." },
+              ],
+            },
+            {
+              num: "02", title: "Genetics and inheritance",
+              sims: [
+                { id: "punnett", title: "Punnett Square", desc: "Cross any two genotypes; phenotype ratios update live." },
+                { id: "pedigree", title: "Pedigree Tracer", desc: "Identify dominant, recessive and sex-linked patterns." },
+              ],
+            },
+            {
+              num: "03", title: "DNA and protein synthesis",
+              sims: [
+                { id: "transcription", title: "Transcription & Translation", desc: "Step through DNA → mRNA → polypeptide one codon at a time." },
+              ],
+            },
+          ],
+        },
+        y12: {
+          label: "Year 12",
+          subtitle: "Physiology and metabolism",
+          chapters: [
+            {
+              num: "01", title: "Photosynthesis and respiration",
+              sims: [
+                { id: "photosynthesis", title: "Photosynthesis Lab", desc: "Light intensity, CO₂ and temperature versus oxygen output." },
+                { id: "respiration", title: "Cellular Respiration", desc: "ATP yield across glycolysis, Krebs and electron transport." },
+              ],
+            },
+            {
+              num: "02", title: "Homeostasis and the nervous system",
+              sims: [
+                { id: "neuron-firing", title: "Action Potential", desc: "Stimulate a neuron and watch Na⁺/K⁺ channels open in sequence." },
+                { id: "thermoregulation", title: "Thermoregulation", desc: "Set environment, behaviour and clothing to track core temperature." },
+              ],
+            },
+            {
+              num: "03", title: "Circulation and gas exchange",
+              sims: [
+                { id: "heart-cycle", title: "Cardiac Cycle", desc: "Pressure–volume loops with adjustable preload and afterload." },
+                { id: "alveolar-gas", title: "Alveolar Gas Exchange", desc: "Partial pressures and diffusion at the alveolus." },
+              ],
+            },
+          ],
+        },
+        y13: {
+          label: "Year 13",
+          subtitle: "Evolution, ecology and biotech",
+          chapters: [
+            {
+              num: "01", title: "Population genetics and evolution",
+              sims: [
+                { id: "hardy-weinberg", title: "Hardy–Weinberg", desc: "Drift, selection and mutation breaking equilibrium." },
+                { id: "natural-selection", title: "Beak Depth Selection", desc: "Climate events shift the distribution generation by generation." },
+              ],
+            },
+            {
+              num: "02", title: "Ecology and ecosystems",
+              sims: [
+                { id: "predator-prey", title: "Predator–Prey Cycles", desc: "Lotka–Volterra with hunting pressure and carrying capacity." },
+                { id: "food-web", title: "Food Web Disruption", desc: "Remove a species and watch trophic cascades propagate." },
+              ],
+            },
+            {
+              num: "03", title: "Biotechnology",
+              sims: [
+                { id: "pcr", title: "PCR Cycler", desc: "Denature, anneal, extend — amplification curve in 30 cycles." },
+                { id: "gel-electrophoresis", title: "Gel Electrophoresis", desc: "Run fragments by size and read the ladder." },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  ],
+};
+
+// English-only copy for both EN and LO (placeholder per spec)
+window.SIM_I18N = {
+  en: {
+    nav_subjects: "Subjects",
+    nav_other: "Library",
+    nav_about: "About",
+    nav_search: "Search",
+    nav_recent: "Recently viewed",
+    home_title: "Interactive science, one sim at a time.",
+    home_title_em: "Curriculum-aligned simulations for Year 11–13.",
+    home_desc: "Live, parametric simulations matched to your textbook chapters in physics, chemistry and biology. Designed for classroom and self-study.",
+    home_browse: "Browse subjects",
+    featured: "Featured simulation",
+    open_sim: "Open simulation",
+    preview: "Preview",
+    stat_subjects: "Subjects",
+    stat_years: "Year levels",
+    stat_chapters: "Chapters",
+    stat_sims: "Simulations",
+    year11: "Year 11",
+    year12: "Year 12",
+    year13: "Year 13",
+    sim_ready: "Ready",
+    sim_draft: "In production",
+    chapter: "Chapter",
+    sims_count: "sims",
+    back: "Back",
+    home: "Home",
+    units: "Units",
+    priority: "Priority",
+    all_units: "All units",
+    in_production: "In production",
+    coming_soon: "Simulation coming soon",
+    theme_light: "Light",
+    theme_dark: "Dark",
+  },
+  lo: {
+    nav_subjects: "ວິຊາ",
+    nav_other: "ຫ້ອງສະໝຸດ",
+    nav_about: "ກຽ່ວກັບ",
+    nav_search: "ຄົ້ນຫາ",
+    nav_recent: "ເບິ່ງລ່າສຸດ",
+    home_title: "ວິທະຍາສາດແບບໂຕ້ຕອບ, ທີລະບົດຈຳລອງ.",
+    home_title_em: "ບົດຈຳລອງໃຫ້ແກ່ຊັ້ນມ.5–11–7.",
+    home_desc: "ບົດຈຳລອງທີ່ມີຊີວິດແລະປັບຄ່າໄດ້, ຕິດຕັ້ງຕາມບົດໃນໃບປຶ້ມວິຊາຟີຊິກສາດ, ເຄມີສາດ ແລະຊີວະສາດ. ອອກແບບສຳລັບໃຊ້ໃນຫ້ອງຣັບ ແລະການສຶກສາດ້ວຍຕົນເອງ.",
+    home_browse: "ເລືອກວິຊາ",
+    featured: "ບົດຈຳລອງແນະນຳ",
+    open_sim: "ເປີດບົດຈຳລອງ",
+    preview: "ດູລ່ວງໜ້າ",
+    stat_subjects: "ວິຊາ",
+    stat_years: "ຊັ້ນຣຽນ",
+    stat_chapters: "ບົດ",
+    stat_sims: "ບົດຈຳລອງ",
+    year11: "ມ.5 (ປີ 11)",
+    year12: "ມ.6 (ປີ 12)",
+    year13: "ມ.7 (ປີ 13)",
+    sim_ready: "ພ້ອມໃຊ້",
+    sim_draft: "ກຳລັງສ້າງ",
+    chapter: "ບົດທີ່",
+    sims_count: "ບົດຈຳລອງ",
+    back: "ກັບຄືນ",
+    home: "ໜ້າຫຼັກ",
+    units: "ໜ່ວຍການ",
+    priority: "ສຳຄັນ",
+    all_units: "ທຸກໜ່ວຍການ",
+    in_production: "ກຳລັງສ້າງ",
+    coming_soon: "ບົດຈຳລອງກຳລັງມາ",
+    theme_light: "ສວ່າງ",
+    theme_dark: "ມືດ",
+  },
+};

@@ -1,0 +1,205 @@
+// Physics curriculum view — uses PHYSICS_DATA from physics-data.js
+// Wired in app.jsx when route.subject === "physics".
+
+const { useState: usePhysState, useMemo: usePhysMemo } = React;
+
+function hexAlpha(hex, a) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// Map app-style year keys (y11/y12/y13) ↔ PHYSICS_DATA year indices (0/1/2)
+const YEAR_KEY_TO_IDX = { y11: 0, y12: 1, y13: 2 };
+const YEAR_IDX_TO_KEY = ["y11", "y12", "y13"];
+
+function physYearLabel(yk, lang) {
+  const t = window.SIM_I18N[lang];
+  return t["year" + yk.slice(1)] || yk;
+}
+
+function PhysicsCurriculumView({ route, lang, onNavigate }) {
+  const PD = window.PHYSICS_DATA;
+  const subject = window.SIM_DATA.subjects.find(s => s.id === "physics");
+  const yearIdx = YEAR_KEY_TO_IDX[route.year] ?? 0;
+  const year = PD.years[yearIdx];
+
+  // If a unit is selected, render the unit detail view
+  if (route.unit) {
+    const unit = year.units.find(u => u.id === route.unit);
+    if (unit) {
+      return <PhysicsUnitDetail route={route} lang={lang} year={year} unit={unit} subject={subject} onNavigate={onNavigate} />;
+    }
+  }
+
+  return (
+    <div className="content">
+      <div className="subject-header">
+        <div className="subject-title-wrap">
+          <div className="subject-title-glyph physics">Ph</div>
+          <div>
+            <h1 className="subject-title">{lang === "lo" ? "ຟີຊິກສາດ" : "Physics"}</h1>
+            <div className="subject-meta">{physYearLabel(route.year, lang)} · {year.title}</div>
+          </div>
+        </div>
+        <div className="year-tabs">
+          {[0, 1, 2].map(i => (
+            <button
+              key={i}
+              className={`year-tab ${i === yearIdx ? "active" : ""}`}
+              onClick={() => onNavigate({ type: "subject", subject: "physics", year: YEAR_IDX_TO_KEY[i] })}
+            >
+              {physYearLabel(YEAR_IDX_TO_KEY[i], lang)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 16 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: "-0.015em" }}>{year.code} · {year.title}</h2>
+          <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            {year.blurb}
+          </span>
+        </div>
+        <div className="phys-stats-bar">
+          <div className="phys-stat">
+            <div className="phys-stat-num">{year.unitCount}</div>
+            <div className="phys-stat-label">{window.SIM_I18N[lang].units || "Units"}</div>
+          </div>
+          <div className="phys-stat">
+            <div className="phys-stat-num">{year.chapterCount}</div>
+            <div className="phys-stat-label">{window.SIM_I18N[lang].stat_chapters}</div>
+          </div>
+          <div className="phys-stat">
+            <div className="phys-stat-num">{year.simCount}</div>
+            <div className="phys-stat-label">{window.SIM_I18N[lang].stat_sims}</div>
+          </div>
+          <div className="phys-stat">
+            <div className="phys-stat-num">{year.starCount}</div>
+            <div className="phys-stat-label">{(window.SIM_I18N[lang].priority || "Priority")} ★</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="unit-grid">
+        {year.units.map(u => (
+          <UnitCard
+            key={u.id}
+            u={u}
+            onClick={() => onNavigate({ type: "subject", subject: "physics", year: route.year, unit: u.id })}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UnitCard({ u, onClick }) {
+  return (
+    <div className="unit-card" onClick={onClick}>
+      <div className="unit-card-band" style={{ background: u.color }}></div>
+      <div className="unit-card-body">
+        <div className="unit-card-head">
+          <div className="unit-chip" style={{ background: hexAlpha(u.color, 0.15), color: u.color }}>{u.num}</div>
+          {u.starCount > 0 && <span className="unit-star-badge">{u.starCount}★</span>}
+        </div>
+        <div className="unit-card-name">{u.name}</div>
+        <div className="unit-card-foot">
+          <div className="unit-sim-bar">
+            {u.chapters.map((c, i) => (
+              <div
+                key={i}
+                className="unit-sim-seg"
+                style={{
+                  background: c.sim ? u.color : "transparent",
+                  opacity: c.star ? 1 : c.sim ? 0.55 : 0,
+                }}
+              ></div>
+            ))}
+          </div>
+          <div className="unit-card-meta">
+            <span>{u.chapterCount} ch</span>
+            <span>{u.simCount}/{u.chapterCount} sims</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PhysicsUnitDetail({ route, lang, year, unit, subject, onNavigate }) {
+  const t = window.SIM_I18N[lang];
+  return (
+    <div className="content">
+      <div className="unit-detail-header">
+        <div className="unit-detail-left">
+          <div
+            className="unit-detail-glyph"
+            style={{ background: hexAlpha(unit.color, 0.15), color: unit.color }}
+          >
+            {unit.num}
+          </div>
+          <div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-3)", marginBottom: 6 }}>
+              {year.code} · {physYearLabel(route.year, lang)} · Unit {unit.num.replace("U", "")}
+            </div>
+            <h1 className="unit-detail-title">{unit.name}</h1>
+            <div className="unit-detail-meta">
+              {unit.chapterCount} {t.stat_chapters?.toLowerCase() || "chapters"} · {unit.simCount} {t.stat_sims?.toLowerCase() || "simulations"}
+              {unit.starCount > 0 && <> · {unit.starCount}★ {t.priority?.toLowerCase() || "priority"}</>}
+            </div>
+          </div>
+        </div>
+        <button
+          className="btn ghost"
+          onClick={() => onNavigate({ type: "subject", subject: "physics", year: route.year })}
+        >
+          ← {t.all_units || "All units"}
+        </button>
+      </div>
+
+      {/* color band stripe */}
+      <div style={{ height: 4, background: unit.color, borderRadius: 999, marginBottom: 24 }}></div>
+
+      <div className="chapter-list">
+        {unit.chapters.map(ch => {
+          const hasSim = !!ch.sim;
+          const isReady = !!ch.file;
+          const clickable = isReady;
+          return (
+            <div
+              key={ch.num}
+              className={`chapter-row ${!hasSim ? "no-sim" : ""}`}
+              onClick={clickable ? () => onNavigate({
+                type: "sim",
+                subject: "physics",
+                year: route.year,
+                simId: `physics-ch${ch.num}`,
+                simTitle: ch.title,
+                file: ch.file,
+              }) : undefined}
+            >
+              <div className="chapter-row-num">Ch. {ch.num}</div>
+              <div>
+                <h3 className="chapter-row-title">{ch.title}</h3>
+                <div className={`chapter-row-sim ${!hasSim ? "empty" : ""}`}>
+                  {hasSim ? ch.sim : (t.coming_soon || "Simulation coming soon")}
+                </div>
+              </div>
+              <div className="chapter-row-status">
+                {ch.star && <span className="star">★ {t.priority || "Priority"}</span>}
+                {isReady && <span className="ready">● {t.sim_ready || "Ready"}</span>}
+                {hasSim && !isReady && <span>{t.in_production || "In production"}</span>}
+                {!hasSim && <span style={{ color: "var(--ink-4)" }}>—</span>}
+                {clickable && <span style={{ color: "var(--ink-3)" }}>→</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { PhysicsCurriculumView });

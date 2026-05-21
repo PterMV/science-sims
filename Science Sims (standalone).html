@@ -1,0 +1,501 @@
+// Physics Curriculum Designs — three explorations from the reference doc
+// All designs share fonts, type scale, and helpers but render distinctly.
+
+const PD = window.PHYSICS_DATA;
+
+// ── shared helpers ─────────────────────────────────────────
+function hexA(hex, a) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// Local style block scoped via class prefix
+const sharedFont = {
+  fontFamily: '"Geist", ui-sans-serif, system-ui, -apple-system, sans-serif',
+  WebkitFontSmoothing: "antialiased",
+  letterSpacing: "-0.005em",
+};
+const mono = '"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace';
+
+/* ════════════════════════════════════════════════════════════
+   DESIGN A — Physics curriculum homepage
+   ════════════════════════════════════════════════════════════ */
+function HomepageDesign() {
+  const year = PD.years[0]; // default to M5 for the artboard
+  // Total stats across all years
+  const totals = PD.years.reduce((a, y) => ({
+    units: a.units + y.unitCount,
+    chapters: a.chapters + y.chapterCount,
+    sims: a.sims + y.simCount,
+  }), { units: 0, chapters: 0, sims: 0 });
+
+  return (
+    <div style={{ ...sharedFont, width: "100%", height: "100%", background: "#fafafa", color: "#0a0a0a", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      {/* Top bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 48px", borderBottom: "1px solid #e7e7ea", background: "#fff" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: "#0a0a0a", display: "grid", placeItems: "center", color: "white", fontSize: 13, fontWeight: 600 }}>S</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Science Interactive Simulation</div>
+            <div style={{ fontSize: 10.5, color: "#71717a", fontFamily: mono, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>Physics · Curriculum</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "inline-flex", border: "1px solid #e7e7ea", borderRadius: 999, padding: 3, fontFamily: mono, fontSize: 11.5 }}>
+            <span style={{ padding: "4px 12px", borderRadius: 999, background: "#0a0a0a", color: "#fff" }}>EN</span>
+            <span style={{ padding: "4px 12px", color: "#71717a" }}>LO</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Hero */}
+      <div style={{ padding: "44px 48px 24px", display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 48, alignItems: "end", borderBottom: "1px solid #e7e7ea" }}>
+        <div>
+          <div style={{ fontFamily: mono, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "#71717a", marginBottom: 16 }}>
+            Physics · Year 11–13 · Cambridge & Lao curriculum
+          </div>
+          <h1 style={{ margin: 0, fontSize: 44, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1.05, textWrap: "balance" }}>
+            22 units. 71 chapters. <span style={{ color: "#71717a" }}>59 interactive simulations.</span>
+          </h1>
+          <p style={{ margin: "16px 0 0", fontSize: 15, color: "#3f3f46", maxWidth: "52ch", lineHeight: 1.55 }}>
+            Each unit carries its own colour through every page, lesson plan and formula box —
+            so students can navigate the whole syllabus by sight.
+          </p>
+        </div>
+        {/* Year picker */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ fontFamily: mono, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "#a1a1aa", marginBottom: 4 }}>Select year</div>
+          {PD.years.map((y, i) => (
+            <div key={y.id} style={{
+              display: "grid", gridTemplateColumns: "44px 1fr auto", gap: 14, alignItems: "center",
+              padding: "12px 14px",
+              border: i === 0 ? "1px solid #0a0a0a" : "1px solid #e7e7ea",
+              background: i === 0 ? "#0a0a0a" : "#fff",
+              color: i === 0 ? "#fff" : "#0a0a0a",
+              borderRadius: 10,
+            }}>
+              <div style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, opacity: i === 0 ? 1 : 0.55 }}>{y.code}</div>
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{y.label} · {y.title}</div>
+                <div style={{ fontSize: 11.5, fontFamily: mono, opacity: 0.6, marginTop: 2 }}>{y.unitCount} units · {y.chapterCount} ch · {y.simCount} sims</div>
+              </div>
+              <div style={{ opacity: 0.5 }}>→</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Unit grid */}
+      <div style={{ padding: "32px 48px 48px", flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 18 }}>
+          <div style={{ display: "flex", gap: 14, alignItems: "baseline" }}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: "-0.015em" }}>{year.label} · {year.title}</h2>
+            <span style={{ fontFamily: mono, fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.06em" }}>{year.unitCount} units</span>
+          </div>
+          <div style={{ display: "flex", gap: 10, fontFamily: mono, fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <span>{year.chapterCount} chapters</span>
+            <span>·</span>
+            <span>{year.simCount} sims</span>
+            <span>·</span>
+            <span style={{ color: "#0a0a0a" }}>{year.starCount}★ priority</span>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+          {year.units.map(u => <UnitCard key={u.id} u={u} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UnitCard({ u }) {
+  return (
+    <div style={{
+      background: "#fff",
+      border: "1px solid #e7e7ea",
+      borderRadius: 12,
+      overflow: "hidden",
+      cursor: "pointer",
+      display: "flex",
+      flexDirection: "column",
+      minHeight: 180,
+    }}>
+      {/* Colour band */}
+      <div style={{ height: 6, background: u.color }}></div>
+
+      <div style={{ padding: "14px 16px 16px", display: "flex", flexDirection: "column", flex: 1, gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 7,
+            background: hexA(u.color, 0.15), color: u.color,
+            display: "grid", placeItems: "center",
+            fontFamily: mono, fontWeight: 600, fontSize: 11.5,
+          }}>{u.num}</div>
+          {u.starCount > 0 && (
+            <span style={{ marginLeft: "auto", fontSize: 10.5, fontFamily: mono, color: "#0a0a0a", background: "#fef9c3", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.04em" }}>
+              {u.starCount}★
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: "-0.01em", lineHeight: 1.25 }}>{u.name}</div>
+
+        <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+          {/* sim availability bar */}
+          <div style={{ display: "flex", gap: 2, height: 5, borderRadius: 999, overflow: "hidden", background: "#f4f4f5" }}>
+            {u.chapters.map((c, i) => (
+              <div key={i} style={{
+                flex: 1,
+                background: c.sim ? u.color : "transparent",
+                opacity: c.star ? 1 : c.sim ? 0.55 : 0,
+              }}></div>
+            ))}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 10.5, color: "#71717a", letterSpacing: "0.04em" }}>
+            <span>{u.chapterCount} ch</span>
+            <span>{u.simCount}/{u.chapterCount} sims</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════
+   DESIGN B — M5 simulation discovery page
+   ════════════════════════════════════════════════════════════ */
+function M5Discovery() {
+  const year = PD.years[0]; // M5
+  // All sims with unit context
+  const allSims = [];
+  for (const u of year.units) {
+    for (const c of u.chapters) {
+      if (c.sim) allSims.push({ unit: u, chapter: c });
+    }
+  }
+  const starred = allSims.filter(x => x.chapter.star);
+  const rest = allSims.filter(x => !x.chapter.star);
+
+  return (
+    <div style={{ ...sharedFont, width: "100%", height: "100%", background: "#fafafa", color: "#0a0a0a", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      {/* breadcrumb bar */}
+      <div style={{ padding: "14px 48px", borderBottom: "1px solid #e7e7ea", background: "rgba(250,250,250,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
+        <div style={{ color: "#71717a", display: "flex", gap: 8 }}>
+          <span>Home</span><span style={{ color: "#a1a1aa" }}>/</span>
+          <span>Physics</span><span style={{ color: "#a1a1aa" }}>/</span>
+          <span style={{ color: "#0a0a0a", fontWeight: 500 }}>Year 11 (M5) · Simulations</span>
+        </div>
+        <div style={{ display: "inline-flex", border: "1px solid #e7e7ea", borderRadius: 999, padding: 3, fontFamily: mono, fontSize: 11 }}>
+          <span style={{ padding: "4px 12px", borderRadius: 999, background: "#0a0a0a", color: "#fff" }}>EN</span>
+          <span style={{ padding: "4px 12px", color: "#71717a" }}>LO</span>
+        </div>
+      </div>
+
+      {/* Header */}
+      <div style={{ padding: "32px 48px 24px", borderBottom: "1px solid #e7e7ea" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
+          <div>
+            <div style={{ fontFamily: mono, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "#71717a", marginBottom: 10 }}>
+              Year 11 · M5 · Mechanics & Thermodynamics
+            </div>
+            <h1 style={{ margin: 0, fontSize: 36, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1.05, textWrap: "balance" }}>
+              {year.simCount} simulations across 7 units of physics.
+            </h1>
+            <p style={{ margin: "12px 0 0", color: "#3f3f46", fontSize: 14, maxWidth: "56ch", lineHeight: 1.55 }}>
+              Browse all M5 simulations, filter by unit, or open the priority list of {year.starCount} highest-impact sims marked with ★.
+            </p>
+          </div>
+          {/* Stats */}
+          <div style={{ display: "flex", gap: 0, border: "1px solid #e7e7ea", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+            {[
+              { n: year.unitCount, label: "Units" },
+              { n: year.chapterCount, label: "Chapters" },
+              { n: year.simCount, label: "Sims" },
+              { n: year.starCount, label: "Priority" },
+            ].map((s, i) => (
+              <div key={i} style={{ padding: "10px 18px", borderRight: i < 3 ? "1px solid #e7e7ea" : "none", textAlign: "center", minWidth: 76 }}>
+                <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>{s.n}</div>
+                <div style={{ fontFamily: mono, fontSize: 9.5, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Unit filter chips */}
+        <div style={{ display: "flex", gap: 8, marginTop: 24, flexWrap: "wrap" }}>
+          <div style={{
+            padding: "7px 12px",
+            border: "1px solid #0a0a0a",
+            background: "#0a0a0a", color: "#fff",
+            borderRadius: 999, fontSize: 12, display: "flex", alignItems: "center", gap: 8,
+          }}>
+            All units <span style={{ fontFamily: mono, opacity: 0.6 }}>{year.simCount}</span>
+          </div>
+          {year.units.map(u => (
+            <div key={u.id} style={{
+              padding: "6px 12px",
+              border: "1px solid #e7e7ea",
+              background: "#fff",
+              borderRadius: 999, fontSize: 12, display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: 4, background: u.color }}></span>
+              {u.name}
+              <span style={{ fontFamily: mono, color: "#71717a", fontSize: 11 }}>{u.simCount}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Priority sims */}
+      <div style={{ padding: "28px 48px 16px" }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em" }}>★ Priority simulations</h2>
+            <span style={{ fontFamily: mono, fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.06em" }}>{starred.length} sims</span>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+          {starred.map((x, i) => <PriorityCard key={i} unit={x.unit} chapter={x.chapter} />)}
+        </div>
+      </div>
+
+      {/* All sims by unit */}
+      <div style={{ padding: "8px 48px 32px", flex: 1, overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "20px 0 14px" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em" }}>All simulations</h2>
+            <span style={{ fontFamily: mono, fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.06em" }}>{rest.length} more</span>
+          </div>
+          <div style={{ fontFamily: mono, fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.06em" }}>Grouped by unit</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          {rest.slice(0, 16).map((x, i) => <SimCardMini key={i} unit={x.unit} chapter={x.chapter} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PriorityCard({ unit, chapter }) {
+  return (
+    <div style={{
+      borderRadius: 12, overflow: "hidden",
+      border: "1px solid #e7e7ea",
+      background: "#fff",
+      display: "flex", flexDirection: "column",
+    }}>
+      <div style={{
+        height: 90,
+        background: `linear-gradient(135deg, ${hexA(unit.color, 0.18)} 0%, ${hexA(unit.color, 0.05)} 100%)`,
+        borderBottom: `1px solid ${hexA(unit.color, 0.25)}`,
+        position: "relative",
+      }}>
+        <div style={{ position: "absolute", top: 10, left: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: mono, fontSize: 10, color: unit.color, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <span style={{ width: 6, height: 6, borderRadius: 3, background: unit.color }}></span>
+          {unit.name}
+        </div>
+        <div style={{ position: "absolute", top: 10, right: 12, background: "#fff", padding: "2px 7px", borderRadius: 4, fontFamily: mono, fontSize: 10, color: "#0a0a0a", fontWeight: 600 }}>
+          ★ Priority
+        </div>
+        <div style={{ position: "absolute", bottom: 10, right: 12, fontFamily: mono, fontSize: 11, color: hexA(unit.color, 0.8), fontWeight: 600 }}>
+          Ch.{chapter.num}
+        </div>
+      </div>
+      <div style={{ padding: "12px 14px 14px", display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: "-0.01em" }}>{chapter.title}</div>
+        <div style={{ fontSize: 12, color: "#3f3f46", lineHeight: 1.5, textWrap: "pretty" }}>{chapter.sim}</div>
+      </div>
+    </div>
+  );
+}
+
+function SimCardMini({ unit, chapter }) {
+  return (
+    <div style={{
+      border: "1px solid #e7e7ea",
+      borderLeft: `3px solid ${unit.color}`,
+      background: "#fff",
+      borderRadius: 8,
+      padding: "10px 12px 12px",
+      display: "flex", flexDirection: "column", gap: 4,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: mono, fontSize: 9.5, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        <span style={{ width: 6, height: 6, borderRadius: 3, background: unit.color }}></span>
+        {unit.name} · Ch.{chapter.num}
+      </div>
+      <div style={{ fontSize: 12.5, fontWeight: 500, letterSpacing: "-0.005em", lineHeight: 1.3 }}>{chapter.title}</div>
+      <div style={{ fontSize: 11.5, color: "#71717a", lineHeight: 1.45 }}>{chapter.sim}</div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════
+   DESIGN C — Year tab navigation variations
+   Multiple takes on the Y11/Y12/Y13 nav using unit colour palette
+   ════════════════════════════════════════════════════════════ */
+
+function TabsHeader({ label, sub }) {
+  return (
+    <div style={{ fontFamily: mono, fontSize: 10.5, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+      {label} <span style={{ color: "#a1a1aa", marginLeft: 6 }}>{sub}</span>
+    </div>
+  );
+}
+
+// V1 — Segmented control with colour-rail underline
+function TabsV1({ active = 0 }) {
+  return (
+    <div style={{ ...sharedFont, background: "#fff", padding: "32px 48px", border: "1px solid #e7e7ea", borderRadius: 16, width: "100%", height: "100%", boxSizing: "border-box" }}>
+      <TabsHeader label="V1 — Segmented with colour rail" sub="Active year highlights with its unit-palette rail" />
+      <div style={{ display: "flex", border: "1px solid #e7e7ea", borderRadius: 12, overflow: "hidden", background: "#fafafa" }}>
+        {PD.years.map((y, i) => (
+          <div key={y.id} style={{
+            flex: 1,
+            padding: "16px 20px 14px",
+            background: i === active ? "#fff" : "transparent",
+            borderRight: i < 2 ? "1px solid #e7e7ea" : "none",
+            position: "relative",
+          }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontFamily: mono, fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.06em" }}>{y.code} · {y.label}</div>
+                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 4, letterSpacing: "-0.015em", color: i === active ? "#0a0a0a" : "#3f3f46" }}>{y.title}</div>
+              </div>
+              <div style={{ fontFamily: mono, fontSize: 11, color: "#71717a" }}>{y.unitCount}u · {y.simCount}⚡</div>
+            </div>
+            {/* unit color rail */}
+            <div style={{ display: "flex", gap: 3, marginTop: 12, height: 4, borderRadius: 999, overflow: "hidden", opacity: i === active ? 1 : 0.35 }}>
+              {y.units.map(u => <div key={u.id} style={{ flex: 1, background: u.color }}></div>)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// V2 — Stacked vertical with full unit palette preview
+function TabsV2({ active = 1 }) {
+  return (
+    <div style={{ ...sharedFont, background: "#fff", padding: "32px 48px", border: "1px solid #e7e7ea", borderRadius: 16, width: "100%", height: "100%", boxSizing: "border-box" }}>
+      <TabsHeader label="V2 — Year picker with full unit swatches" sub="Each tab previews its entire unit colour palette" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+        {PD.years.map((y, i) => (
+          <div key={y.id} style={{
+            padding: "16px 18px",
+            border: i === active ? "1.5px solid #0a0a0a" : "1px solid #e7e7ea",
+            borderRadius: 12,
+            background: i === active ? "#fff" : "#fafafa",
+            boxShadow: i === active ? "0 1px 0 #0a0a0a" : "none",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div style={{ fontFamily: mono, fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em" }}>{y.code}</div>
+              <div style={{ fontFamily: mono, fontSize: 10.5, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.06em" }}>{y.label}</div>
+            </div>
+            <div style={{ fontSize: 13.5, fontWeight: 500, marginTop: 6 }}>{y.title}</div>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${y.units.length}, 1fr)`, gap: 3, marginTop: 12 }}>
+              {y.units.map(u => (
+                <div key={u.id} title={u.name} style={{ height: 22, background: u.color, borderRadius: 4 }}></div>
+              ))}
+            </div>
+            <div style={{ fontFamily: mono, fontSize: 10.5, color: "#71717a", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.06em", display: "flex", justifyContent: "space-between" }}>
+              <span>{y.unitCount} units</span>
+              <span>{y.simCount} sims · {y.starCount}★</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// V3 — Pill tabs with colour dot legend
+function TabsV3({ active = 2 }) {
+  return (
+    <div style={{ ...sharedFont, background: "#fff", padding: "32px 48px", border: "1px solid #e7e7ea", borderRadius: 16, width: "100%", height: "100%", boxSizing: "border-box" }}>
+      <TabsHeader label="V3 — Pill nav + active unit legend" sub="Compact bar; selected year expands its unit list inline" />
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {PD.years.map((y, i) => (
+          <button key={y.id} style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "10px 16px",
+            borderRadius: 999,
+            border: i === active ? "none" : "1px solid #e7e7ea",
+            background: i === active ? "#0a0a0a" : "#fff",
+            color: i === active ? "#fff" : "#0a0a0a",
+            fontSize: 13.5,
+            fontWeight: 500,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}>
+            <span style={{ fontFamily: mono, opacity: 0.6, fontSize: 12 }}>{y.code}</span>
+            {y.label}
+            <span style={{ fontFamily: mono, opacity: 0.55, fontSize: 11, marginLeft: 4 }}>{y.simCount}⚡</span>
+          </button>
+        ))}
+      </div>
+      {/* Active year's unit chips */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {PD.years[active].units.map(u => (
+          <div key={u.id} style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "4px 10px 4px 8px",
+            borderRadius: 999,
+            background: hexA(u.color, 0.12),
+            color: u.color,
+            fontSize: 11.5,
+            fontWeight: 500,
+          }}>
+            <span style={{ width: 8, height: 8, borderRadius: 4, background: u.color }}></span>
+            {u.name}
+            <span style={{ fontFamily: mono, opacity: 0.6, fontSize: 10.5 }}>{u.simCount}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// V4 — Wide editorial header
+function TabsV4({ active = 0 }) {
+  return (
+    <div style={{ ...sharedFont, background: "#0a0a0a", color: "#fff", padding: "32px 48px", borderRadius: 16, width: "100%", height: "100%", boxSizing: "border-box" }}>
+      <TabsHeader label="V4 — Dark editorial header" sub="Year as masthead, units listed underneath" />
+      <div style={{ display: "flex", gap: 24, marginTop: 18, alignItems: "baseline" }}>
+        {PD.years.map((y, i) => (
+          <div key={y.id} style={{
+            flex: i === active ? 1.4 : 1,
+            paddingBottom: 14,
+            borderBottom: i === active ? "2px solid #fff" : "2px solid rgba(255,255,255,0.12)",
+            opacity: i === active ? 1 : 0.55,
+            cursor: "pointer",
+          }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+              <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em" }}>{y.label}</div>
+              <div style={{ fontFamily: mono, fontSize: 11.5, opacity: 0.65, textTransform: "uppercase", letterSpacing: "0.06em" }}>{y.code}</div>
+            </div>
+            <div style={{ fontSize: 13, marginTop: 4, opacity: 0.85 }}>{y.title}</div>
+            {i === active && (
+              <div style={{ display: "flex", gap: 4, marginTop: 14, flexWrap: "wrap" }}>
+                {y.units.map(u => (
+                  <span key={u.id} style={{
+                    fontFamily: mono, fontSize: 10.5,
+                    padding: "3px 8px", borderRadius: 4,
+                    background: hexA(u.color, 0.18),
+                    color: u.color,
+                    fontWeight: 500,
+                  }}>{u.num} · {u.name}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, {
+  HomepageDesign, M5Discovery, TabsV1, TabsV2, TabsV3, TabsV4,
+});

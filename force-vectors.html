@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accelerated Motion — Sim</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --surface-2: #f4f4f5;
+      --border: #e7e7ea;
+      --ink: #0a0a0a;
+      --ink-2: #3f3f46;
+      --ink-3: #71717a;
+      --ink-4: #a1a1aa;
+      --car: oklch(0.52 0.18 250);      /* blue (Kinematics unit) */
+      --vel: oklch(0.60 0.16 220);      /* lighter blue */
+      --acc: oklch(0.62 0.18 30);       /* orange */
+      --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--sans); background: var(--bg); color: var(--ink); font-size: 14px; -webkit-font-smoothing: antialiased; }
+
+    .sim { display: grid; grid-template-columns: 1fr 320px; height: 100vh; min-height: 600px; }
+    @media (max-width: 760px) {
+      .sim { grid-template-columns: 1fr; grid-template-rows: minmax(420px, 60vh) 1fr; min-height: 0; }
+      .panel { border-left: none; border-top: 1px solid var(--border); }
+    }
+
+    .stage { position: relative; background: linear-gradient(180deg, #f8f8fa 0%, #f0f0f3 100%); display: grid; grid-template-rows: 1fr 1fr; overflow: hidden; }
+
+    /* Scene */
+    .scene { position: relative; padding: 18px 24px; border-bottom: 1px solid var(--border); background: #fff; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+    .scene-head { display: flex; align-items: baseline; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+    .scene-head .clock { color: var(--ink); font-weight: 500; font-size: 12px; }
+    .track-wrap { display: flex; flex-direction: column; gap: 18px; flex: 1; justify-content: center; }
+    .track { position: relative; height: 56px; background: var(--surface-2); border-radius: 8px; overflow: visible; }
+    .track-ticks { position: absolute; inset: 0; display: flex; justify-content: space-between; padding: 0 2px; }
+    .track-tick { width: 1px; background: rgba(0,0,0,0.08); }
+    .track-tick.major { background: rgba(0,0,0,0.18); }
+    .strobe { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 4px; height: 16px; background: var(--car); opacity: 0.25; border-radius: 2px; pointer-events: none; }
+    .strobe.head { opacity: 0.6; }
+    .stop-mark { position: absolute; top: -10px; bottom: -10px; width: 2px; background: var(--ink); transform: translateX(-50%); pointer-events: none; }
+    .stop-mark::before {
+      content: "stop"; position: absolute; top: -16px; left: 4px;
+      font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink);
+      background: #fef9c3; padding: 1px 5px; border-radius: 3px;
+      white-space: nowrap;
+    }
+    .track-labels {
+      font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      display: flex; justify-content: space-between;
+    }
+
+    /* Vertical orientation overrides */
+    .scene.vertical .track-wrap {
+      flex-direction: row;
+      gap: 12px;
+      align-items: stretch;
+      min-height: 240px;
+    }
+    .scene.vertical .ground-banner {
+      flex: none;
+      width: 12px;
+      background: repeating-linear-gradient(45deg, var(--ink-4), var(--ink-4) 4px, transparent 4px, transparent 8px);
+      border-radius: 0;
+    }
+    .scene.vertical .track {
+      width: 56px;
+      height: auto;
+      flex: 1;
+    }
+    .scene.vertical .track-ticks {
+      flex-direction: column;
+      padding: 2px 0;
+    }
+    .scene.vertical .track-tick {
+      width: 100%; height: 1px;
+    }
+    .scene.vertical .strobe {
+      width: 22px; height: 4px;
+      top: auto; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .scene.vertical .stop-mark {
+      width: auto; height: 2px;
+      top: auto; left: -10px; right: -10px; bottom: auto;
+      transform: translateY(-50%);
+    }
+    .scene.vertical .stop-mark::before {
+      top: 4px; left: 16px;
+    }
+    .scene.vertical .track-labels {
+      flex-direction: column;
+      writing-mode: horizontal-tb;
+      align-self: stretch;
+      justify-content: space-between;
+      padding: 0 0 0 6px;
+    }
+    .scene.vertical .vectors {
+      display: block;
+      position: absolute;
+      top: 0; bottom: 0; height: auto;
+      left: calc(100% + 8px);
+      width: 34px;
+      pointer-events: none;
+    }
+    .scene.vertical .vec {
+      position: absolute;
+      width: 4px;
+      height: 0;
+      top: 0;
+      transform-origin: top center;
+      transform: translateX(-50%);
+      border-radius: 2px;
+    }
+    .scene.vertical .vec.vel { left: 8px; }
+    .scene.vertical .vec.acc { left: 24px; top: 0; }
+    .scene.vertical .vec::after {
+      content: "";
+      position: absolute;
+      left: 50%; top: 100%; right: auto; bottom: auto;
+      transform: translate(-50%, -1px);
+      width: 0; height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid currentColor;
+      border-bottom: none;
+    }
+    .scene.vertical .vec.vel::after { color: var(--vel); }
+    .scene.vertical .vec.acc::after { color: var(--acc); }
+    .scene.vertical .vec.reverse {
+      transform: translateX(-50%) scaleY(-1);
+    }
+    .scene.vertical .vec-label {
+      position: absolute;
+      font-family: var(--mono);
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      transform: translate(-50%, 0);
+      pointer-events: none;
+    }
+    .scene.vertical .ground-line {
+      position: absolute;
+      left: -8px; right: -8px;
+      bottom: -6px;
+      height: 3px;
+      background:
+        linear-gradient(90deg, #a1a1aa 0 50%, transparent 50% 100%) repeat-x,
+        var(--ink-3);
+      background-size: 6px 100%, auto;
+    }
+    .scene.vertical .car {
+      width: 32px; height: 32px;
+      left: 50%; top: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle at 32% 30%, oklch(0.72 0.14 250) 0%, var(--car) 45%, oklch(0.38 0.18 250) 100%);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+    }
+    .scene.vertical .car::before,
+    .scene.vertical .car::after { display: none; }
+    .scene.vertical .car .windshield { display: none; }
+    .car {
+      position: absolute; top: 50%;
+      width: 44px; height: 24px;
+      transform: translate(-50%, -50%);
+      background: var(--car);
+      border-radius: 4px 8px 4px 4px;
+    }
+    .car::before, .car::after { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); bottom: -4px; }
+    .car::before { left: 6px; }
+    .car::after { right: 6px; }
+    .car .windshield { position: absolute; top: 2px; left: 24px; right: 4px; bottom: 8px; background: rgba(255,255,255,0.4); border-radius: 2px 4px 1px 1px; }
+
+    /* Arrows above track for v and a vectors */
+    .vectors {
+      position: absolute;
+      top: -28px; left: 0; right: 0;
+      height: 24px;
+      pointer-events: none;
+    }
+    .vec {
+      position: absolute;
+      top: 50%;
+      height: 4px;
+      border-radius: 2px;
+      transform-origin: left center;
+      transform: translateY(-50%);
+      transition: none;
+    }
+    .vec.vel { background: var(--vel); }
+    .vec.acc { background: var(--acc); top: calc(50% + 6px); }
+    .vec::after {
+      content: ""; position: absolute; right: -2px; top: 50%; transform: translateY(-50%);
+      width: 0; height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 7px solid currentColor;
+    }
+    .vec.vel::after { color: var(--vel); }
+    .vec.acc::after { color: var(--acc); }
+    .vec.reverse { transform-origin: right center; transform: translateY(-50%) scaleX(-1); }
+
+    /* Graphs */
+    .graphs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+    .graph { padding: 12px 16px; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: #fff; min-width: 0; }
+    .graph:last-child { border-right: none; }
+    .graph-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+    .graph-head strong { color: var(--ink); font-weight: 500; }
+    .graph svg { width: 100%; flex: 1; min-height: 0; }
+
+    /* Panel (matches uniform-motion sim) */
+    .panel {
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      padding: 22px 22px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      overflow-y: auto;
+    }
+    .panel-header h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.015em; }
+    .panel-header p { margin: 4px 0 0; font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+
+    .ctrl-group { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; background: var(--surface-2); border-radius: 10px; }
+    .ctrl-group-head { display: flex; align-items: center; gap: 8px; }
+    .ctrl-group-swatch { width: 12px; height: 12px; border-radius: 3px; }
+    .ctrl-group-label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); }
+
+    .ctrl { display: flex; flex-direction: column; gap: 5px; }
+    .ctrl-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; }
+    .ctrl-label { color: var(--ink-2); }
+    .ctrl-value { font-family: var(--mono); font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .ctrl-value .unit { color: var(--ink-3); margin-left: 2px; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 4px;
+      background: #fff;
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px;
+      background: var(--ink); border-radius: 50%;
+      border: 2px solid var(--surface);
+      box-shadow: 0 0 0 1px var(--border); cursor: grab;
+    }
+    input[type="range"].thumb-v::-webkit-slider-thumb { background: var(--vel); }
+    input[type="range"].thumb-a::-webkit-slider-thumb { background: var(--acc); }
+    input[type="range"]::-moz-range-thumb {
+      width: 16px; height: 16px;
+      background: var(--ink); border-radius: 50%;
+      border: 2px solid var(--surface);
+    }
+
+    .btn-row { display: flex; gap: 8px; }
+    .btn {
+      flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 10px 12px; border-radius: 8px;
+      font-size: 13px; font-weight: 500;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--ink); font-family: inherit; cursor: pointer;
+    }
+    .btn.primary { background: var(--ink); color: white; border-color: var(--ink); }
+    .btn:hover { background: var(--surface-2); }
+    .btn.primary:hover { background: var(--ink-2); }
+
+    .toggle { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--surface-2); border-radius: 8px; font-size: 12.5px; cursor: pointer; user-select: none; }
+    .toggle .switch { width: 32px; height: 18px; background: var(--border); border-radius: 999px; position: relative; transition: background 0.15s; }
+    .toggle .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: #fff; border-radius: 50%; transition: transform 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+    .toggle.on .switch { background: var(--ink); }
+    .toggle.on .switch::after { transform: translateX(14px); }
+
+    .readout-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .readout {
+      padding: 10px 12px;
+      border-right: 1px solid var(--border);
+      text-align: center;
+    }
+    .readout:last-child { border-right: none; }
+    .readout-label { font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin-bottom: 2px; }
+    .readout-value { font-family: var(--mono); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .readout-value .u { font-weight: 400; color: var(--ink-3); font-size: 10.5px; margin-left: 2px; }
+
+    .tip {
+      background: var(--surface-2);
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--ink-2);
+      line-height: 1.55;
+      border-left: 3px solid var(--ink);
+    }
+    .tip strong { color: var(--ink); font-weight: 600; }
+    .tip code { font-family: var(--mono); background: #fff; padding: 1px 5px; border-radius: 3px; font-size: 11.5px; }
+  </style>
+</head>
+<body>
+  <div class="sim">
+    <div class="stage">
+      <div class="scene" id="scene">
+        <div class="scene-head">
+          <span id="scene-title">Single car · uniformly accelerated motion</span>
+          <span class="clock">t = <span id="t-out">0.0</span> s</span>
+        </div>
+
+        <div class="track-wrap">
+          <div class="track" id="track">
+            <div class="track-ticks" id="ticks"></div>
+            <div class="vectors" id="vectors"></div>
+            <div class="stop-mark" id="stop-mark" style="display: none;"></div>
+            <div class="ground-line" id="ground-line" style="display: none;"></div>
+            <div class="car" id="car" style="left: 0%;">
+              <div class="windshield"></div>
+            </div>
+          </div>
+          <div class="track-labels" id="track-labels">
+            <span>0 m</span><span id="track-mid">25 m</span><span id="track-end">50 m</span>
+          </div>
+        </div>
+
+        <div class="readout-row">
+          <div class="readout">
+            <div class="readout-label">Position x</div>
+            <div class="readout-value"><span id="x-out">0.0</span><span class="u">m</span></div>
+          </div>
+          <div class="readout">
+            <div class="readout-label">Velocity v</div>
+            <div class="readout-value"><span id="v-out">0.0</span><span class="u">m/s</span></div>
+          </div>
+          <div class="readout">
+            <div class="readout-label">Accel a</div>
+            <div class="readout-value"><span id="a-out">0.0</span><span class="u">m/s²</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="graphs">
+        <div class="graph">
+          <div class="graph-head"><strong>x – t</strong> <span>parabola</span></div>
+          <svg id="graph-xt" viewBox="0 0 240 180" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="graph">
+          <div class="graph-head"><strong>v – t</strong> <span>straight line</span></div>
+          <svg id="graph-vt" viewBox="0 0 240 180" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="graph">
+          <div class="graph-head"><strong>a – t</strong> <span>constant</span></div>
+          <svg id="graph-at" viewBox="0 0 240 180" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-header">
+        <h2>Accelerated Motion</h2>
+        <p>Set initial velocity and constant acceleration. Watch the x–t parabola, v–t line, and a–t constant build live.</p>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-group-head">
+          <span class="ctrl-group-swatch" style="background: var(--ink)"></span>
+          <span class="ctrl-group-label">Track</span>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Distance</span>
+            <span class="ctrl-value"><span id="d-out">50</span><span class="unit">m</span></span>
+          </div>
+          <input type="range" id="d-input" min="20" max="2000" step="10" value="50" />
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Start position x₀</span>
+            <span class="ctrl-value"><span id="x0-out">0</span><span class="unit">m</span></span>
+          </div>
+          <input type="range" id="x0-input" min="0" max="50" step="1" value="0" />
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-group-head">
+          <span class="ctrl-group-swatch" style="background: var(--vel)"></span>
+          <span class="ctrl-group-label">Initial velocity v₀</span>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">v₀</span>
+            <span class="ctrl-value"><span id="v0-out">0.0</span><span class="unit">m/s</span></span>
+          </div>
+          <input type="range" id="v0-input" class="thumb-v" min="-30" max="30" step="0.5" value="0" />
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-group-head">
+          <span class="ctrl-group-swatch" style="background: var(--acc)"></span>
+          <span class="ctrl-group-label">Acceleration a</span>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">a</span>
+            <span class="ctrl-value"><span id="a0-out">2.0</span><span class="unit">m/s²</span></span>
+          </div>
+          <input type="range" id="a0-input" class="thumb-a" min="-15" max="15" step="0.1" value="2" />
+        </div>
+      </div>
+
+      <div>
+        <div style="font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-4); margin-bottom: 6px;">Quick scenarios</div>
+        <div class="btn-row" style="gap: 6px;">
+          <button class="btn" data-preset="speedup" style="font-size: 11.5px; padding: 8px 8px;">↗ Speed up</button>
+          <button class="btn" data-preset="brake" style="font-size: 11.5px; padding: 8px 8px;">↘ Brake</button>
+          <button class="btn" data-preset="freefall" style="font-size: 11.5px; padding: 8px 8px;">↓ Free-fall</button>
+        </div>
+      </div>
+
+      <div class="toggle on" id="strobe-toggle">
+        <span>Stroboscope markers</span>
+        <span class="switch"></span>
+      </div>
+
+      <div class="toggle" id="vertical-toggle">
+        <span>Vertical orientation</span>
+        <span class="switch"></span>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" id="play-btn">▶ Play</button>
+        <button class="btn" id="reset-btn">↺ Reset</button>
+      </div>
+
+      <div class="tip">
+        <strong>Uniformly accelerated motion</strong> follows
+        <code>v = v₀ + at</code> and <code>x = x₀ + v₀t + ½at²</code>.
+        The v–t graph is a line with slope <em>a</em>; the x–t graph is a parabola.
+        Equal-time markers along the track <em>spread out</em> when the car is speeding up.
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ── Constants ─────────────────────────────────────────
+    const G_W = 240, G_H = 180;
+    const G_PAD = { l: 32, r: 6, t: 12, b: 22 };
+    const PLOT_W = G_W - G_PAD.l - G_PAD.r;
+    const PLOT_H = G_H - G_PAD.t - G_PAD.b;
+
+    function computeTMax(D) {
+      return Math.max(10, Math.min(120, D / 4));
+    }
+
+    // ── State ─────────────────────────────────────────────
+    const state = {
+      D: 50,
+      T_MAX: 10,
+      v0: 0, a: 2, x0: 0,
+      x: 0, v: 0,
+      t: 0,
+      mode: "ready",
+      strobe: true,
+      vertical: false,
+      raf: null, lastFrame: 0, firstFrame: true,
+    };
+    state.T_MAX = computeTMax(state.D);
+
+    const $ = (id) => document.getElementById(id);
+
+    // ── Physics ───────────────────────────────────────────
+    const xAt = (t) => state.x0 + state.v0 * t + 0.5 * state.a * t * t;
+    const vAt = (t) => state.v0 + state.a * t;
+
+    // Time when velocity == 0 (sign change)
+    function stopTime() {
+      if (Math.abs(state.a) < 1e-6) return null;
+      const ts = -state.v0 / state.a;
+      if (ts <= 0 || ts > state.T_MAX) return null;
+      return ts;
+    }
+
+    // ── Track ticks ───────────────────────────────────────
+    function buildTicks() {
+      const wrap = $("ticks"); wrap.innerHTML = "";
+      for (let i = 0; i <= 10; i++) {
+        const t = document.createElement("div");
+        t.className = "track-tick" + (i % 5 === 0 ? " major" : "");
+        wrap.appendChild(t);
+      }
+    }
+
+    // ── Graph helpers (mirror uniform-motion sim) ─────────
+    function niceStep(range, target) {
+      const raw = range / target;
+      const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+      const norm = raw / pow;
+      const step = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+      return step * pow;
+    }
+    function gridAndAxes(svg, xMax, yRange, xLabel, yLabel) {
+      const { min: yMin, max: yMax } = yRange;
+      svg.innerHTML = "";
+      const NS = "http://www.w3.org/2000/svg";
+      const xToPx = (x) => G_PAD.l + (x / xMax) * PLOT_W;
+      const yToPx = (y) => G_PAD.t + ((yMax - y) / (yMax - yMin)) * PLOT_H;
+      const xStep = niceStep(xMax, 5);
+      for (let x = 0; x <= xMax + xStep * 0.4; x += xStep) {
+        const line = document.createElementNS(NS, "line");
+        line.setAttribute("x1", xToPx(x)); line.setAttribute("x2", xToPx(x));
+        line.setAttribute("y1", G_PAD.t); line.setAttribute("y2", G_H - G_PAD.b);
+        line.setAttribute("stroke", "rgba(0,0,0,0.05)");
+        svg.appendChild(line);
+        const lbl = document.createElementNS(NS, "text");
+        lbl.setAttribute("x", xToPx(x)); lbl.setAttribute("y", G_H - G_PAD.b + 13);
+        lbl.setAttribute("text-anchor", "middle");
+        lbl.setAttribute("fill", "var(--ink-4)");
+        lbl.setAttribute("font-family", "var(--mono)");
+        lbl.setAttribute("font-size", "9");
+        lbl.textContent = x.toFixed(0);
+        svg.appendChild(lbl);
+      }
+      const yStep = niceStep(yMax - yMin, 4);
+      for (let y = Math.ceil(yMin / yStep) * yStep; y <= yMax; y += yStep) {
+        const line = document.createElementNS(NS, "line");
+        line.setAttribute("x1", G_PAD.l); line.setAttribute("x2", G_W - G_PAD.r);
+        line.setAttribute("y1", yToPx(y)); line.setAttribute("y2", yToPx(y));
+        line.setAttribute("stroke", y === 0 ? "rgba(0,0,0,0.22)" : "rgba(0,0,0,0.05)");
+        svg.appendChild(line);
+        const lbl = document.createElementNS(NS, "text");
+        lbl.setAttribute("x", G_PAD.l - 4); lbl.setAttribute("y", yToPx(y) + 3);
+        lbl.setAttribute("text-anchor", "end");
+        lbl.setAttribute("fill", "var(--ink-4)");
+        lbl.setAttribute("font-family", "var(--mono)");
+        lbl.setAttribute("font-size", "9");
+        lbl.textContent = formatTick(y, yStep);
+        svg.appendChild(lbl);
+      }
+      const xL = document.createElementNS(NS, "text");
+      xL.setAttribute("x", G_W - G_PAD.r); xL.setAttribute("y", G_H - 4);
+      xL.setAttribute("text-anchor", "end");
+      xL.setAttribute("fill", "var(--ink-3)");
+      xL.setAttribute("font-family", "var(--mono)");
+      xL.setAttribute("font-size", "9");
+      xL.textContent = xLabel;
+      svg.appendChild(xL);
+      const yL = document.createElementNS(NS, "text");
+      yL.setAttribute("x", 4); yL.setAttribute("y", G_PAD.t + 4);
+      yL.setAttribute("fill", "var(--ink-3)");
+      yL.setAttribute("font-family", "var(--mono)");
+      yL.setAttribute("font-size", "9");
+      yL.textContent = yLabel;
+      svg.appendChild(yL);
+      return { xToPx, yToPx };
+    }
+    function formatTick(v, step) {
+      if (step >= 1) return v.toFixed(0);
+      if (step >= 0.1) return v.toFixed(1);
+      return v.toFixed(2);
+    }
+    function drawLine(svg, pts, color, width = 2) {
+      const NS = "http://www.w3.org/2000/svg";
+      if (pts.length < 2) return;
+      const d = pts.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+      const path = document.createElementNS(NS, "path");
+      path.setAttribute("d", d);
+      path.setAttribute("stroke", color);
+      path.setAttribute("stroke-width", width);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(path);
+    }
+    function drawDot(svg, x, y, color, r = 3.5) {
+      const NS = "http://www.w3.org/2000/svg";
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("r", r);
+      c.setAttribute("fill", color);
+      c.setAttribute("stroke", "#fff"); c.setAttribute("stroke-width", "1.5");
+      svg.appendChild(c);
+    }
+
+    // ── Sample x(t), v(t) over [0, T_MAX] for graphs ──────
+    function xtPoints(N = 80) {
+      const pts = [];
+      for (let i = 0; i <= N; i++) {
+        const tt = (i / N) * state.T_MAX;
+        pts.push({ t: tt, x: xAt(tt) });
+      }
+      return pts;
+    }
+
+    function placeCar(x, v) {
+      const pct = Math.max(0, Math.min(100, (x / state.D) * 100));
+      const el = $("car");
+      if (state.vertical) {
+        el.style.left = "50%";
+        el.style.top = pct + "%";
+        el.style.transform = `translate(-50%, -50%)`;
+      } else {
+        el.style.left = pct + "%";
+        el.style.top = "50%";
+        el.style.transform = `translate(-50%, -50%) scaleX(${v < 0 ? -1 : 1})`;
+      }
+    }
+
+    function placeOnTrack(el, frac) {
+      const pct = Math.max(-2, Math.min(102, frac * 100));
+      if (state.vertical) {
+        el.style.top = pct + "%";
+        el.style.left = "";
+      } else {
+        el.style.left = pct + "%";
+        el.style.top = "";
+      }
+    }
+
+    // ── Vectors (above the car / beside the ball) ─────────
+    function drawVectors() {
+      const wrap = $("vectors");
+      wrap.innerHTML = "";
+      const trackPct = (x) => Math.max(0, Math.min(100, (x / state.D) * 100));
+      const carPct = trackPct(state.x);
+      const vertical = state.vertical;
+
+      // Velocity vector
+      const vMag = Math.abs(state.v);
+      if (vMag > 0.1) {
+        const lenPct = Math.min(38, vMag * (vertical ? 1.4 : 1.8));
+        const vec = document.createElement("div");
+        vec.className = "vec vel" + (state.v < 0 ? " reverse" : "");
+        if (vertical) {
+          vec.style.top = carPct + "%";
+          vec.style.height = lenPct + "%";
+        } else {
+          vec.style.left = carPct + "%";
+          vec.style.width = lenPct + "%";
+        }
+        wrap.appendChild(vec);
+      }
+      // Acceleration vector
+      const aMag = Math.abs(state.a);
+      if (aMag > 0.05) {
+        const lenPct = Math.min(38, aMag * (vertical ? 2 : 3));
+        const vec = document.createElement("div");
+        vec.className = "vec acc" + (state.a < 0 ? " reverse" : "");
+        if (vertical) {
+          vec.style.top = carPct + "%";
+          vec.style.height = lenPct + "%";
+        } else {
+          vec.style.left = carPct + "%";
+          vec.style.width = lenPct + "%";
+        }
+        wrap.appendChild(vec);
+      }
+
+      // Vertical mode: small "v" / "a" letter labels at top of column
+      if (vertical) {
+        const vl = document.createElement("div");
+        vl.className = "vec-label";
+        vl.style.left = "8px";
+        vl.style.top = "-14px";
+        vl.style.color = "var(--vel)";
+        vl.textContent = "v";
+        wrap.appendChild(vl);
+        const al = document.createElement("div");
+        al.className = "vec-label";
+        al.style.left = "24px";
+        al.style.top = "-14px";
+        al.style.color = "var(--acc)";
+        al.textContent = "a";
+        wrap.appendChild(al);
+      }
+    }
+
+    // ── Landing time (only meaningful in vertical/free-fall) ──
+    function landingTime() {
+      if (!state.vertical) return null;
+      // Solve x0 + v0 t + 0.5 a t^2 = D for smallest t > 0
+      const A = 0.5 * state.a;
+      const B = state.v0;
+      const C = state.x0 - state.D;
+      if (Math.abs(A) < 1e-9) {
+        if (Math.abs(B) < 1e-9) return null;
+        const t = -C / B;
+        return t > 1e-6 ? t : null;
+      }
+      const disc = B * B - 4 * A * C;
+      if (disc < 0) return null;
+      const sq = Math.sqrt(disc);
+      const ts = [(-B - sq) / (2 * A), (-B + sq) / (2 * A)]
+        .filter(t => t > 1e-6)
+        .sort((x, y) => x - y);
+      return ts.length ? ts[0] : null;
+    }
+
+    // ── Stroboscope markers along track (equal time intervals) ──
+    function drawStrobeMarkers() {
+      const track = $("track");
+      // Remove existing
+      track.querySelectorAll(".strobe").forEach(n => n.remove());
+      if (!state.strobe) return;
+      // Pick interval so we get ~8 markers across T_MAX
+      const N = 8;
+      const dt = state.T_MAX / N;
+      for (let i = 1; i <= N; i++) {
+        const tt = i * dt;
+        const x = xAt(tt);
+        // Skip if outside track
+        if (x < 0 || x > state.D) continue;
+        const m = document.createElement("div");
+        m.className = "strobe" + (tt <= state.t ? " head" : "");
+        placeOnTrack(m, x / state.D);
+        track.appendChild(m);
+      }
+    }
+
+    // ── Stop marker on track ──────────────────────────────
+    function drawStopMark() {
+      const mark = $("stop-mark");
+      const ts = stopTime();
+      if (ts === null) { mark.style.display = "none"; return; }
+      const xs = xAt(ts);
+      if (xs < 0 || xs > state.D) { mark.style.display = "none"; return; }
+      mark.style.display = "block";
+      placeOnTrack(mark, xs / state.D);
+    }
+
+    // ── Graphs ────────────────────────────────────────────
+    function drawGraphs() {
+      const xt = $("graph-xt"), vt = $("graph-vt"), at = $("graph-at");
+      const samples = xtPoints();
+      const xs = samples.map(p => p.x);
+      const xMaxData = Math.max(...xs, state.D * 0.5);
+      const xMinData = Math.min(...xs, 0);
+      const pad = Math.max(2, (xMaxData - xMinData) * 0.08);
+      const xtAxes = gridAndAxes(xt, state.T_MAX, { min: Math.floor(xMinData - pad), max: Math.ceil(xMaxData + pad) }, "t (s)", "x (m)");
+      // Track-edge guides
+      const NS = "http://www.w3.org/2000/svg";
+      [0, state.D].forEach(y => {
+        const line = document.createElementNS(NS, "line");
+        line.setAttribute("x1", xtAxes.xToPx(0)); line.setAttribute("x2", xtAxes.xToPx(state.T_MAX));
+        line.setAttribute("y1", xtAxes.yToPx(y)); line.setAttribute("y2", xtAxes.yToPx(y));
+        line.setAttribute("stroke", "rgba(0,0,0,0.15)");
+        line.setAttribute("stroke-dasharray", "2 3");
+        xt.appendChild(line);
+      });
+      // Full parabola, faint
+      drawLine(xt, samples.map(p => [xtAxes.xToPx(p.t), xtAxes.yToPx(p.x)]), "var(--car)", 1.2);
+      // Played portion
+      if (state.t > 0) {
+        drawLine(xt, samples.filter(p => p.t <= state.t).map(p => [xtAxes.xToPx(p.t), xtAxes.yToPx(p.x)]), "var(--car)", 2.5);
+        drawDot(xt, xtAxes.xToPx(state.t), xtAxes.yToPx(state.x), "var(--car)");
+      }
+      // Stop indicator on x-t
+      const ts = stopTime();
+      if (ts !== null) {
+        const xs2 = xAt(ts);
+        drawDot(xt, xtAxes.xToPx(ts), xtAxes.yToPx(xs2), "#0a0a0a", 3);
+      }
+
+      // v-t
+      const vMaxData = Math.max(Math.abs(state.v0), Math.abs(vAt(state.T_MAX)));
+      const vRange = Math.max(5, Math.ceil(vMaxData * 1.15));
+      const vtAxes = gridAndAxes(vt, state.T_MAX, { min: -vRange, max: vRange }, "t (s)", "v (m/s)");
+      const vSamples = [];
+      for (let i = 0; i <= 60; i++) {
+        const tt = (i / 60) * state.T_MAX;
+        vSamples.push([vtAxes.xToPx(tt), vtAxes.yToPx(vAt(tt))]);
+      }
+      drawLine(vt, vSamples, "var(--vel)", 1.2);
+      // Played portion + shaded area = displacement
+      if (state.t > 0) {
+        const x0p = vtAxes.xToPx(0), x1p = vtAxes.xToPx(state.t);
+        const yZero = vtAxes.yToPx(0);
+        // Build a polygon under the v(t) curve
+        const NS2 = "http://www.w3.org/2000/svg";
+        const poly = document.createElementNS(NS2, "path");
+        let d = `M${x0p} ${yZero} `;
+        const M = 30;
+        for (let i = 0; i <= M; i++) {
+          const tt = (i / M) * state.t;
+          d += `L${vtAxes.xToPx(tt)} ${vtAxes.yToPx(vAt(tt))} `;
+        }
+        d += `L${x1p} ${yZero} Z`;
+        poly.setAttribute("d", d);
+        poly.setAttribute("fill", "var(--vel)");
+        poly.setAttribute("fill-opacity", "0.15");
+        vt.appendChild(poly);
+
+        drawLine(vt, vSamples.filter((_, i) => (i / 60) * state.T_MAX <= state.t), "var(--vel)", 2.5);
+        drawDot(vt, x1p, vtAxes.yToPx(state.v), "var(--vel)");
+      }
+      // Stop indicator (where v crosses 0)
+      if (ts !== null) {
+        drawDot(vt, vtAxes.xToPx(ts), vtAxes.yToPx(0), "#0a0a0a", 3);
+      }
+
+      // a-t
+      const aRange = Math.max(2, Math.ceil(Math.abs(state.a) * 1.4));
+      const atAxes = gridAndAxes(at, state.T_MAX, { min: -aRange, max: aRange }, "t (s)", "a (m/s²)");
+      drawLine(at,
+        [[atAxes.xToPx(0), atAxes.yToPx(state.a)], [atAxes.xToPx(state.T_MAX), atAxes.yToPx(state.a)]],
+        "var(--acc)", 1.2);
+      if (state.t > 0) {
+        drawLine(at,
+          [[atAxes.xToPx(0), atAxes.yToPx(state.a)], [atAxes.xToPx(state.t), atAxes.yToPx(state.a)]],
+          "var(--acc)", 2.5);
+        drawDot(at, atAxes.xToPx(state.t), atAxes.yToPx(state.a), "var(--acc)");
+      }
+    }
+
+    // ── Render ───────────────────────────────────────────
+    function render() {
+      $("d-out").textContent = state.D.toFixed(0);
+      $("track-mid").textContent = (state.D / 2).toFixed(0) + " m";
+      $("track-end").textContent = state.D.toFixed(0) + " m";
+
+      placeCar(state.x, state.v);
+      $("x-out").textContent = state.x.toFixed(1);
+      $("v-out").textContent = state.v.toFixed(1);
+      $("a-out").textContent = state.a.toFixed(2);
+      $("t-out").textContent = state.t.toFixed(1);
+
+      drawStrobeMarkers();
+      drawStopMark();
+      drawVectors();
+      drawGraphs();
+    }
+
+    // ── Animation ────────────────────────────────────────
+    function step(now) {
+      if (state.mode !== "running") return;
+      if (state.firstFrame) {
+        state.firstFrame = false;
+        state.lastFrame = now;
+        state.raf = requestAnimationFrame(step);
+        return;
+      }
+      const dt = Math.max(0, Math.min(0.05, (now - state.lastFrame) / 1000));
+      state.lastFrame = now;
+      state.t += dt;
+      const tLand = landingTime();
+      if (tLand !== null && state.t >= tLand) {
+        state.t = tLand;
+        state.x = state.D;
+        state.v = vAt(tLand);
+        state.mode = "done";
+        $("play-btn").innerHTML = "▶ Play";
+        render();
+        return;
+      }
+      if (state.t >= state.T_MAX) {
+        state.t = state.T_MAX;
+        state.mode = "done";
+        $("play-btn").innerHTML = "▶ Play";
+      }
+      state.x = xAt(state.t);
+      state.v = vAt(state.t);
+      // Clamp to ground in vertical mode (safety)
+      if (state.vertical && state.x > state.D) state.x = state.D;
+      render();
+      if (state.mode === "running") state.raf = requestAnimationFrame(step);
+    }
+
+    function play() {
+      if (state.mode === "running") {
+        cancelAnimationFrame(state.raf);
+        state.mode = "ready";
+        $("play-btn").innerHTML = "▶ Resume";
+        return;
+      }
+      if (state.mode === "done" || state.t >= state.T_MAX) {
+        state.t = 0; state.x = state.x0; state.v = state.v0;
+      }
+      state.mode = "running";
+      state.firstFrame = true;
+      $("play-btn").innerHTML = "⏸ Pause";
+      state.raf = requestAnimationFrame(step);
+    }
+
+    function reset() {
+      cancelAnimationFrame(state.raf);
+      state.mode = "ready";
+      state.t = 0;
+      state.x = state.x0;
+      state.v = state.v0;
+      $("play-btn").innerHTML = "▶ Play";
+      render();
+    }
+
+    // ── Bindings ─────────────────────────────────────────
+    function clampX0() {
+      $("x0-input").max = state.D;
+      if (state.x0 > state.D) {
+        state.x0 = state.D;
+        $("x0-input").value = state.D;
+        $("x0-out").textContent = state.D.toFixed(0);
+      }
+    }
+
+    $("d-input").addEventListener("input", (e) => {
+      state.D = parseFloat(e.target.value);
+      state.T_MAX = computeTMax(state.D);
+      clampX0();
+      if (state.mode !== "running") {
+        state.x = xAt(state.t);
+        render();
+      }
+    });
+    $("x0-input").addEventListener("input", (e) => {
+      state.x0 = parseFloat(e.target.value);
+      $("x0-out").textContent = state.x0.toFixed(0);
+      state.t = 0; state.mode = "ready"; $("play-btn").innerHTML = "▶ Play";
+      state.x = state.x0; state.v = state.v0;
+      render();
+    });
+    $("v0-input").addEventListener("input", (e) => {
+      state.v0 = parseFloat(e.target.value);
+      $("v0-out").textContent = state.v0.toFixed(1);
+      if (state.mode !== "running") {
+        state.v = vAt(state.t);
+        state.x = xAt(state.t);
+        render();
+      }
+    });
+    $("a0-input").addEventListener("input", (e) => {
+      state.a = parseFloat(e.target.value);
+      $("a0-out").textContent = state.a.toFixed(2);
+      if (state.mode !== "running") {
+        state.v = vAt(state.t);
+        state.x = xAt(state.t);
+        render();
+      }
+    });
+
+    function applyPreset(name) {
+      cancelAnimationFrame(state.raf);
+      state.mode = "ready"; state.t = 0;
+      $("play-btn").innerHTML = "▶ Play";
+      if (name === "speedup") {
+        state.D = 200; state.x0 = 0; state.v0 = 0; state.a = 2;
+      } else if (name === "brake") {
+        state.D = 100; state.x0 = 0; state.v0 = 15; state.a = -3;
+      } else if (name === "freefall") {
+        // Vertical free-fall: object drops from rest under gravity (a = 9.81 m/s²)
+        state.D = 100; state.x0 = 0; state.v0 = 0; state.a = 9.81;
+        setVertical(true);
+      }
+      if (name !== "freefall") setVertical(false);
+      state.T_MAX = computeTMax(state.D);
+      // sync inputs
+      $("d-input").value = state.D; $("d-out").textContent = state.D.toFixed(0);
+      clampX0();
+      $("x0-input").value = state.x0; $("x0-out").textContent = state.x0.toFixed(0);
+      $("v0-input").value = state.v0; $("v0-out").textContent = state.v0.toFixed(1);
+      $("a0-input").value = state.a; $("a0-out").textContent = state.a.toFixed(2);
+      state.x = state.x0; state.v = state.v0;
+      render();
+    }
+    document.querySelectorAll("[data-preset]").forEach(btn => {
+      btn.addEventListener("click", () => applyPreset(btn.dataset.preset));
+    });
+
+    $("strobe-toggle").addEventListener("click", () => {
+      state.strobe = !state.strobe;
+      $("strobe-toggle").classList.toggle("on", state.strobe);
+      render();
+    });
+    $("vertical-toggle").addEventListener("click", () => {
+      setVertical(!state.vertical);
+      render();
+    });
+
+    function setVertical(on) {
+      state.vertical = !!on;
+      $("scene").classList.toggle("vertical", state.vertical);
+      $("scene-title").textContent = state.vertical
+        ? "Falling object · vertical motion under gravity"
+        : "Single car · uniformly accelerated motion";
+      $("ground-line").style.display = state.vertical ? "block" : "none";
+      const t = $("vertical-toggle");
+      if (t) t.classList.toggle("on", state.vertical);
+    }
+    $("play-btn").addEventListener("click", play);
+    $("reset-btn").addEventListener("click", reset);
+
+    // ── Init ─────────────────────────────────────────────
+    buildTicks();
+    state.x = state.x0; state.v = state.v0;
+    render();
+  </script>
+</body>
+</html>

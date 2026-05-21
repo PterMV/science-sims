@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newton's 2nd Law (F = ma) — Sim</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --surface-2: #f4f4f5;
+      --border: #e7e7ea;
+      --ink: #0a0a0a;
+      --ink-2: #3f3f46;
+      --ink-3: #71717a;
+      --ink-4: #a1a1aa;
+      --block: #F97316;            /* Dynamics unit orange */
+      --force: oklch(0.55 0.18 250); /* applied force: blue */
+      --friction: oklch(0.55 0.04 60);/* friction: warm gray */
+      --normal: oklch(0.55 0.15 150);/* normal: green */
+      --weight: oklch(0.55 0.18 30); /* weight: red-orange */
+      --accel:  oklch(0.45 0.05 250);/* accel: deep slate */
+      --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--sans); background: var(--bg); color: var(--ink); font-size: 14px; -webkit-font-smoothing: antialiased; }
+
+    .sim { display: grid; grid-template-columns: 1fr 340px; height: 100vh; min-height: 600px; }
+    @media (max-width: 760px) {
+      .sim { grid-template-columns: 1fr; grid-template-rows: minmax(420px, 60vh) 1fr; min-height: 0; }
+      .panel { border-left: none; border-top: 1px solid var(--border); }
+    }
+
+    .stage { position: relative; background: linear-gradient(180deg, #f8f8fa 0%, #f0f0f3 100%); display: grid; grid-template-rows: 1fr auto auto; overflow: hidden; }
+
+    /* Scene */
+    .scene { position: relative; padding: 18px 24px; border-bottom: 1px solid var(--border); background: #fff; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+    .scene-head { display: flex; align-items: baseline; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+    .scene-head .clock { color: var(--ink); font-weight: 500; font-size: 12px; }
+    .track-wrap { display: flex; flex-direction: column; gap: 18px; flex: 1; justify-content: center; }
+    .track { position: relative; height: 80px; }
+    .ground {
+      position: absolute; left: 0; right: 0;
+      bottom: 0; height: 12px;
+      background: repeating-linear-gradient(135deg, var(--ink-4), var(--ink-4) 4px, transparent 4px, transparent 8px);
+      border-top: 2px solid var(--ink-3);
+    }
+    .ground.ice {
+      background: repeating-linear-gradient(135deg, oklch(0.85 0.05 220), oklch(0.85 0.05 220) 4px, transparent 4px, transparent 9px);
+      border-top: 2px solid oklch(0.7 0.06 220);
+    }
+    .stop-mark { position: absolute; top: 0; bottom: 14px; width: 2px; background: var(--ink); transform: translateX(-50%); pointer-events: none; }
+    .stop-mark::before {
+      content: "wall"; position: absolute; bottom: 4px; left: 4px;
+      font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink);
+      background: #fef9c3; padding: 1px 5px; border-radius: 3px; white-space: nowrap;
+    }
+    .track-labels {
+      font-family: var(--mono); font-size: 10.5px; color: var(--ink-4);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      display: flex; justify-content: space-between;
+    }
+
+    /* Block */
+    .block {
+      position: absolute;
+      bottom: 12px; left: 0;
+      background: var(--block);
+      border-radius: 6px;
+      transition: width 0.18s, height 0.18s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12), inset 0 -3px 0 rgba(0,0,0,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--mono); font-weight: 600; font-size: 13px; color: #fff;
+    }
+    .block .label { text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+
+    /* Force vectors on the block */
+    .fbd { position: absolute; pointer-events: none; }
+    .arrow {
+      position: absolute;
+      height: 4px;
+      border-radius: 2px;
+      transform-origin: left center;
+    }
+    .arrow::after {
+      content: ""; position: absolute; right: -2px; top: 50%; transform: translateY(-50%);
+      width: 0; height: 0;
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+      border-left: 8px solid currentColor;
+    }
+    .arrow.force    { background: var(--force);    color: var(--force); }
+    .arrow.friction { background: var(--friction); color: var(--friction); }
+    .arrow.normal   { background: var(--normal);   color: var(--normal); }
+    .arrow.weight   { background: var(--weight);   color: var(--weight); }
+    .arrow.accel    { background: var(--accel);    color: var(--accel); height: 6px; border-radius: 3px; }
+    .arrow.accel::after {
+      border-top: 7px solid transparent;
+      border-bottom: 7px solid transparent;
+      border-left: 9px solid currentColor;
+    }
+    .arrow.reverse {
+      transform-origin: right center;
+      transform: scaleX(-1);
+    }
+    .vec-tag {
+      position: absolute;
+      font-family: var(--mono); font-size: 11px; font-weight: 600;
+      padding: 1px 4px; border-radius: 3px;
+      background: #fff;
+      box-shadow: 0 0 0 1px var(--border);
+      white-space: nowrap;
+      transform: translate(-50%, -50%);
+    }
+    .vec-tag.force    { color: var(--force); }
+    .vec-tag.friction { color: var(--friction); }
+    .vec-tag.normal   { color: var(--normal); }
+    .vec-tag.weight   { color: var(--weight); }
+    .vec-tag.accel    { color: var(--accel); }
+
+    /* Readouts */
+    .readout-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .readout {
+      padding: 10px 12px;
+      border-right: 1px solid var(--border);
+      text-align: center;
+    }
+    .readout:last-child { border-right: none; }
+    .readout-label { font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin-bottom: 2px; }
+    .readout-value { font-family: var(--mono); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .readout-value .u { font-weight: 400; color: var(--ink-3); font-size: 10.5px; margin-left: 2px; }
+
+    /* Equation strip */
+    .eq-strip {
+      padding: 14px 18px;
+      background: #fff;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-family: var(--mono);
+      flex-wrap: wrap;
+    }
+    .eq {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 15px; font-weight: 500;
+    }
+    .eq .a { color: var(--accel); }
+    .eq .f { color: var(--force); }
+    .eq .m { color: var(--block); }
+    .eq .frac { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
+    .eq .frac > div { padding: 1px 6px; font-size: 13px; }
+    .eq .frac > .num { border-bottom: 1.5px solid currentColor; color: var(--ink-2); }
+    .eq-result { font-family: var(--mono); font-size: 15px; font-weight: 500; }
+    .eq-result .accent { color: var(--accel); }
+
+    /* Mini chart */
+    .chart {
+      padding: 12px 16px 16px;
+      background: #fff;
+      border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .chart-head { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); display: flex; justify-content: space-between; }
+    .chart-head strong { color: var(--ink); font-weight: 500; }
+    .chart svg { width: 100%; height: 130px; }
+
+    /* Panel */
+    .panel {
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      padding: 22px 22px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+    .panel-header h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.015em; }
+    .panel-header p { margin: 4px 0 0; font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+
+    .ctrl-group { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; background: var(--surface-2); border-radius: 10px; }
+    .ctrl-group-head { display: flex; align-items: center; gap: 8px; }
+    .ctrl-group-swatch { width: 12px; height: 12px; border-radius: 3px; }
+    .ctrl-group-label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); flex: 1; }
+
+    .ctrl { display: flex; flex-direction: column; gap: 5px; }
+    .ctrl-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; }
+    .ctrl-label { color: var(--ink-2); }
+    .ctrl-value { font-family: var(--mono); font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .ctrl-value .unit { color: var(--ink-3); margin-left: 2px; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 4px;
+      background: #fff;
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px;
+      background: var(--ink); border-radius: 50%;
+      border: 2px solid var(--surface);
+      box-shadow: 0 0 0 1px var(--border); cursor: grab;
+    }
+    input[type="range"].thumb-m::-webkit-slider-thumb { background: var(--block); }
+    input[type="range"].thumb-f::-webkit-slider-thumb { background: var(--force); }
+    input[type="range"].thumb-mu::-webkit-slider-thumb { background: var(--friction); }
+
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 9px 8px; border-radius: 8px;
+      font-size: 11.5px; font-weight: 500;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--ink); font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .btn:hover { background: var(--surface-2); }
+    .btn.primary { background: var(--ink); color: white; border-color: var(--ink); font-size: 13px; padding: 10px 12px; }
+    .btn.primary:hover { background: var(--ink-2); }
+
+    .toggle { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--surface-2); border-radius: 8px; font-size: 12.5px; cursor: pointer; user-select: none; }
+    .toggle .switch { width: 32px; height: 18px; background: var(--border); border-radius: 999px; position: relative; transition: background 0.15s; }
+    .toggle .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: #fff; border-radius: 50%; transition: transform 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+    .toggle.on .switch { background: var(--ink); }
+    .toggle.on .switch::after { transform: translateX(14px); }
+
+    .tip {
+      background: var(--surface-2);
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--ink-2);
+      line-height: 1.55;
+      border-left: 3px solid var(--block);
+    }
+    .tip strong { color: var(--ink); font-weight: 600; }
+    .tip code { font-family: var(--mono); background: #fff; padding: 1px 5px; border-radius: 3px; font-size: 11.5px; }
+  </style>
+</head>
+<body>
+  <div class="sim">
+    <div class="stage">
+      <div class="scene">
+        <div class="scene-head">
+          <span>Block on a surface · push it with force F</span>
+          <span class="clock">t = <span id="t-out">0.0</span> s</span>
+        </div>
+
+        <div class="track-wrap">
+          <div class="track" id="track">
+            <div class="ground" id="ground"></div>
+            <div class="stop-mark" id="stop-mark"></div>
+            <div class="block" id="block">
+              <span class="label" id="block-label">m</span>
+            </div>
+            <div class="fbd" id="fbd"></div>
+          </div>
+          <div class="track-labels">
+            <span>0 m</span>
+            <span id="track-mid">10 m</span>
+            <span id="track-end">20 m</span>
+          </div>
+        </div>
+
+        <div class="readout-row">
+          <div class="readout">
+            <div class="readout-label">Net force</div>
+            <div class="readout-value"><span id="net-out">0.0</span><span class="u">N</span></div>
+          </div>
+          <div class="readout">
+            <div class="readout-label">Acceleration</div>
+            <div class="readout-value"><span id="a-out">0.00</span><span class="u">m/s²</span></div>
+          </div>
+          <div class="readout">
+            <div class="readout-label">Velocity</div>
+            <div class="readout-value"><span id="v-out">0.0</span><span class="u">m/s</span></div>
+          </div>
+          <div class="readout">
+            <div class="readout-label">Position</div>
+            <div class="readout-value"><span id="x-out">0.0</span><span class="u">m</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="eq-strip">
+        <span class="eq">
+          <span class="a">a</span> = 
+          <span class="frac"><div class="num">F<sub>net</sub></div><div class="m">m</div></span>
+          =
+          <span class="frac"><div class="num"><span id="eq-fnet">8.0</span> N</div><div><span id="eq-m">2.0</span> kg</div></span>
+        </span>
+        <span class="eq-result">= <span class="accent" id="eq-a">4.00</span> m/s²</span>
+      </div>
+
+      <div class="chart">
+        <div class="chart-head"><strong>v–t</strong> <span>velocity grows at constant rate a</span></div>
+        <svg id="vt" viewBox="0 0 480 130" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-header">
+        <h2>Newton's 2nd Law</h2>
+        <p>The net force on an object equals its mass times its acceleration: <strong>F = ma</strong>. Vary F and m and watch a respond.</p>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-group-head">
+          <span class="ctrl-group-swatch" style="background: var(--block)"></span>
+          <span class="ctrl-group-label">Mass m</span>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">m</span>
+            <span class="ctrl-value"><span id="m-disp">2.0</span><span class="unit">kg</span></span>
+          </div>
+          <input type="range" id="m-input" class="thumb-m" min="0.5" max="20" step="0.1" value="2" />
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-group-head">
+          <span class="ctrl-group-swatch" style="background: var(--force)"></span>
+          <span class="ctrl-group-label">Applied force F</span>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">F (→ +x)</span>
+            <span class="ctrl-value"><span id="f-disp">8.0</span><span class="unit">N</span></span>
+          </div>
+          <input type="range" id="f-input" class="thumb-f" min="-30" max="30" step="0.5" value="8" />
+        </div>
+      </div>
+
+      <div class="ctrl-group" id="g-mu">
+        <div class="ctrl-group-head">
+          <span class="ctrl-group-swatch" style="background: var(--friction)"></span>
+          <span class="ctrl-group-label">Surface friction</span>
+        </div>
+        <div class="toggle on" id="friction-toggle" style="margin: 0; padding: 6px 10px; background: #fff;">
+          <span>Friction on</span>
+          <span class="switch"></span>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">μ<sub>k</sub> (kinetic)</span>
+            <span class="ctrl-value"><span id="mu-disp">0.20</span></span>
+          </div>
+          <input type="range" id="mu-input" class="thumb-mu" min="0" max="0.6" step="0.01" value="0.2" />
+        </div>
+      </div>
+
+      <div class="toggle on" id="fbd-toggle">
+        <span>Show free-body diagram</span>
+        <span class="switch"></span>
+      </div>
+
+      <div>
+        <div style="font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-4); margin-bottom: 6px;">Quick scenarios</div>
+        <div class="btn-row">
+          <button class="btn" data-preset="double-f">2× F</button>
+          <button class="btn" data-preset="double-m">2× m</button>
+          <button class="btn" data-preset="ice">On ice</button>
+          <button class="btn" data-preset="stuck">Won't budge</button>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" id="play-btn">▶ Play</button>
+        <button class="btn" id="reset-btn">↺ Reset</button>
+      </div>
+
+      <div class="tip">
+        <strong>Net force is what matters.</strong> If F &lt; static friction, the block stays put. Once it's moving, kinetic friction <code>f<sub>k</sub> = μ<sub>k</sub> · mg</code> opposes motion. <strong>F<sub>net</sub> = F − f<sub>k</sub></strong> drives the acceleration.
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const G = 9.81;
+
+    const state = {
+      m: 2,
+      F: 8,
+      friction: true,
+      muK: 0.2,
+      D: 20,           // track length in meters
+      fbd: true,
+      x: 0, v: 0, t: 0,
+      mode: "ready",
+      raf: null, lastFrame: 0, firstFrame: true,
+      vHistory: [{ t: 0, v: 0 }],
+      T_MAX: 12,
+      ice: false,
+    };
+
+    // ── Physics ──
+    function netForce() {
+      // Kinetic friction model. Treat static threshold as μ·m·g too (simple).
+      if (!state.friction) return state.F;
+      const fk = state.muK * state.m * G;
+      // If at rest and |F| <= static threshold → block doesn't move.
+      if (Math.abs(state.v) < 1e-4 && Math.abs(state.F) <= fk + 1e-6) {
+        return 0;
+      }
+      // Otherwise friction opposes velocity (or applied force if at rest moving from now)
+      const dir = Math.abs(state.v) > 1e-4 ? Math.sign(state.v) : Math.sign(state.F);
+      return state.F - dir * fk;
+    }
+    function acceleration() {
+      return netForce() / state.m;
+    }
+
+    // ── Block sizing (visual) ──
+    function blockSize() {
+      // Width grows mildly with mass (40–84 px); height proportional.
+      const w = 38 + Math.min(54, Math.sqrt(state.m) * 18);
+      const h = w * 0.78;
+      return { w, h };
+    }
+
+    // ── Layout ──
+    function placeBlock() {
+      const trackEl = $("track");
+      const tw = trackEl.clientWidth;
+      const { w, h } = blockSize();
+      $("block").style.width = w + "px";
+      $("block").style.height = h + "px";
+      const pct = Math.max(0, Math.min(1, state.x / state.D));
+      const leftPx = pct * (tw - w);
+      $("block").style.left = leftPx + "px";
+
+      // Wall mark at right edge
+      $("stop-mark").style.left = (tw - 1) + "px";
+
+      drawFBD(leftPx, w, h);
+    }
+
+    function arrow(klass, originX, originY, lengthPx, opts = {}) {
+      const a = document.createElement("div");
+      a.className = "arrow " + klass + (lengthPx < 0 ? " reverse" : "");
+      a.style.position = "absolute";
+      a.style.left = originX + "px";
+      a.style.top  = originY + "px";
+      a.style.width = Math.abs(lengthPx) + "px";
+      if (lengthPx < 0) {
+        a.style.left = (originX - Math.abs(lengthPx)) + "px";
+      }
+      return a;
+    }
+    function tag(klass, x, y, text) {
+      const t = document.createElement("div");
+      t.className = "vec-tag " + klass;
+      t.style.left = x + "px";
+      t.style.top = y + "px";
+      t.textContent = text;
+      return t;
+    }
+
+    function drawFBD(blockLeft, bw, bh) {
+      const fbd = $("fbd");
+      fbd.innerHTML = "";
+      if (!state.fbd) return;
+      const trackEl = $("track");
+      const groundY = trackEl.clientHeight - 12; // top of ground
+      const blockCenterX = blockLeft + bw / 2;
+      const blockCenterY = groundY - bh / 2;
+
+      const F = state.F;
+      const fk = state.friction ? state.muK * state.m * G : 0;
+      const Wmag = state.m * G;
+      const N = Wmag;
+      const a = acceleration();
+
+      const FORCE_PX_PER_N = 4.5;
+      const ACC_PX_PER_MPS2 = 22;
+
+      // Applied force from block side
+      if (Math.abs(F) > 0.05) {
+        const lenPx = Math.sign(F) * Math.min(140, Math.abs(F) * FORCE_PX_PER_N);
+        const ox = F >= 0 ? blockLeft + bw : blockLeft;
+        const oy = blockCenterY;
+        fbd.appendChild(arrow("force", ox, oy - 2, lenPx));
+        fbd.appendChild(tag("force", ox + lenPx / 2, oy - 14, `F = ${F.toFixed(1)} N`));
+      }
+      // Friction (opposes motion; if at rest, opposite to F)
+      if (state.friction && fk > 0.05) {
+        const moving = Math.abs(state.v) > 1e-4;
+        const oppDir = moving ? -Math.sign(state.v) : -Math.sign(F);
+        if (oppDir !== 0) {
+          const lenPx = oppDir * Math.min(140, fk * FORCE_PX_PER_N);
+          const ox = oppDir > 0 ? blockLeft + bw : blockLeft;
+          const oy = blockCenterY + 12;
+          fbd.appendChild(arrow("friction", ox, oy - 2, lenPx));
+          fbd.appendChild(tag("friction", ox + lenPx / 2, oy + 12, `f = ${fk.toFixed(1)} N`));
+        }
+      }
+      // Acceleration vector inside block, top
+      if (Math.abs(a) > 0.02) {
+        const lenPx = Math.sign(a) * Math.min(90, Math.abs(a) * ACC_PX_PER_MPS2);
+        const ox = blockLeft + bw / 2;
+        const oy = blockCenterY - bh / 2 - 18;
+        fbd.appendChild(arrow("accel", ox, oy - 3, lenPx));
+        fbd.appendChild(tag("accel", ox + lenPx / 2, oy - 12, `a = ${a.toFixed(2)} m/s²`));
+      }
+      // Weight (down) and Normal (up) -- thin
+      const grav = arrow("weight", blockCenterX - 1.5, blockCenterY, 0);
+      grav.style.width = "3px";
+      grav.style.height = Math.min(28, Wmag * 1.2) + "px";
+      grav.style.background = "var(--weight)";
+      grav.style.borderRadius = "1px";
+      // weight arrowhead drawn separately
+      const wh = document.createElement("div");
+      wh.style.position = "absolute";
+      wh.style.left = (blockCenterX - 5) + "px";
+      wh.style.top = (blockCenterY + Math.min(28, Wmag * 1.2) - 1) + "px";
+      wh.style.width = 0; wh.style.height = 0;
+      wh.style.borderLeft = "5px solid transparent";
+      wh.style.borderRight = "5px solid transparent";
+      wh.style.borderTop = "7px solid var(--weight)";
+      fbd.appendChild(grav); fbd.appendChild(wh);
+      fbd.appendChild(tag("weight", blockCenterX + 16, blockCenterY + Math.min(28, Wmag * 1.2) / 2, `W = ${Wmag.toFixed(1)} N`));
+
+      const normLen = Math.min(28, N * 1.2);
+      const norm = document.createElement("div");
+      norm.style.position = "absolute";
+      norm.style.left = (blockCenterX - 1.5) + "px";
+      norm.style.top = (blockCenterY - normLen) + "px";
+      norm.style.width = "3px";
+      norm.style.height = normLen + "px";
+      norm.style.background = "var(--normal)";
+      norm.style.borderRadius = "1px";
+      const nh = document.createElement("div");
+      nh.style.position = "absolute";
+      nh.style.left = (blockCenterX - 5) + "px";
+      nh.style.top = (blockCenterY - normLen - 6) + "px";
+      nh.style.width = 0; nh.style.height = 0;
+      nh.style.borderLeft = "5px solid transparent";
+      nh.style.borderRight = "5px solid transparent";
+      nh.style.borderBottom = "7px solid var(--normal)";
+      fbd.appendChild(norm); fbd.appendChild(nh);
+      fbd.appendChild(tag("normal", blockCenterX - 22, blockCenterY - normLen / 2, `N = ${N.toFixed(1)} N`));
+    }
+
+    // ── v-t mini chart ──
+    function drawVt() {
+      const svg = $("vt");
+      svg.innerHTML = "";
+      const W = 480, H = 130;
+      const PAD = { l: 32, r: 8, t: 10, b: 22 };
+      const PW = W - PAD.l - PAD.r;
+      const PH = H - PAD.t - PAD.b;
+      const NS = "http://www.w3.org/2000/svg";
+
+      // Figure y-range from history
+      const vMax = state.vHistory.reduce((m, p) => Math.max(m, Math.abs(p.v)), 1);
+      const yRange = Math.max(2, Math.ceil(vMax * 1.15));
+      const xMax = state.T_MAX;
+
+      const xToPx = (t) => PAD.l + (t / xMax) * PW;
+      const yToPx = (v) => PAD.t + ((yRange - v) / (2 * yRange)) * PH;
+
+      // gridlines
+      for (let i = 0; i <= 4; i++) {
+        const x = PAD.l + (i / 4) * PW;
+        const l = document.createElementNS(NS, "line");
+        l.setAttribute("x1", x); l.setAttribute("x2", x);
+        l.setAttribute("y1", PAD.t); l.setAttribute("y2", PAD.t + PH);
+        l.setAttribute("stroke", "rgba(0,0,0,0.05)");
+        svg.appendChild(l);
+        const lbl = document.createElementNS(NS, "text");
+        lbl.setAttribute("x", x); lbl.setAttribute("y", PAD.t + PH + 13);
+        lbl.setAttribute("text-anchor", "middle");
+        lbl.setAttribute("fill", "var(--ink-4)");
+        lbl.setAttribute("font-family", "var(--mono)");
+        lbl.setAttribute("font-size", "9");
+        lbl.textContent = ((i / 4) * xMax).toFixed(0);
+        svg.appendChild(lbl);
+      }
+      for (let i = -2; i <= 2; i++) {
+        const y = yToPx((i / 2) * yRange);
+        const l = document.createElementNS(NS, "line");
+        l.setAttribute("x1", PAD.l); l.setAttribute("x2", W - PAD.r);
+        l.setAttribute("y1", y); l.setAttribute("y2", y);
+        l.setAttribute("stroke", i === 0 ? "rgba(0,0,0,0.22)" : "rgba(0,0,0,0.05)");
+        svg.appendChild(l);
+        const lbl = document.createElementNS(NS, "text");
+        lbl.setAttribute("x", PAD.l - 4); lbl.setAttribute("y", y + 3);
+        lbl.setAttribute("text-anchor", "end");
+        lbl.setAttribute("fill", "var(--ink-4)");
+        lbl.setAttribute("font-family", "var(--mono)");
+        lbl.setAttribute("font-size", "9");
+        lbl.textContent = ((i / 2) * yRange).toFixed(0);
+        svg.appendChild(lbl);
+      }
+      // axis labels
+      const xL = document.createElementNS(NS, "text");
+      xL.setAttribute("x", W - PAD.r); xL.setAttribute("y", H - 4);
+      xL.setAttribute("text-anchor", "end");
+      xL.setAttribute("fill", "var(--ink-3)");
+      xL.setAttribute("font-family", "var(--mono)");
+      xL.setAttribute("font-size", "9");
+      xL.textContent = "t (s)";
+      svg.appendChild(xL);
+      const yL = document.createElementNS(NS, "text");
+      yL.setAttribute("x", 4); yL.setAttribute("y", PAD.t + 4);
+      yL.setAttribute("fill", "var(--ink-3)");
+      yL.setAttribute("font-family", "var(--mono)");
+      yL.setAttribute("font-size", "9");
+      yL.textContent = "v (m/s)";
+      svg.appendChild(yL);
+
+      // history line
+      const path = document.createElementNS(NS, "path");
+      const d = state.vHistory.map((p, i) => (i === 0 ? "M" : "L") + xToPx(p.t).toFixed(1) + " " + yToPx(p.v).toFixed(1)).join(" ");
+      path.setAttribute("d", d);
+      path.setAttribute("stroke", "var(--accel)");
+      path.setAttribute("stroke-width", "2");
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke-linecap", "round");
+      svg.appendChild(path);
+
+      // current point
+      const last = state.vHistory[state.vHistory.length - 1];
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("cx", xToPx(last.t));
+      dot.setAttribute("cy", yToPx(last.v));
+      dot.setAttribute("r", 3.5);
+      dot.setAttribute("fill", "var(--accel)");
+      dot.setAttribute("stroke", "#fff");
+      dot.setAttribute("stroke-width", "1.5");
+      svg.appendChild(dot);
+    }
+
+    // ── Render ──
+    function render() {
+      $("m-disp").textContent = state.m.toFixed(1);
+      $("f-disp").textContent = state.F.toFixed(1);
+      $("mu-disp").textContent = state.muK.toFixed(2);
+      $("block-label").textContent = state.m.toFixed(1) + " kg";
+
+      const Fnet = netForce();
+      const a = acceleration();
+      $("net-out").textContent = Fnet.toFixed(1);
+      $("a-out").textContent = a.toFixed(2);
+      $("v-out").textContent = state.v.toFixed(2);
+      $("x-out").textContent = state.x.toFixed(2);
+      $("t-out").textContent = state.t.toFixed(1);
+      $("eq-fnet").textContent = Fnet.toFixed(1);
+      $("eq-m").textContent = state.m.toFixed(1);
+      $("eq-a").textContent = a.toFixed(2);
+
+      $("track-mid").textContent = (state.D / 2).toFixed(0) + " m";
+      $("track-end").textContent = state.D.toFixed(0) + " m";
+
+      $("ground").classList.toggle("ice", state.ice);
+      placeBlock();
+      drawVt();
+    }
+
+    // ── Animation ──
+    function step(now) {
+      if (state.mode !== "running") return;
+      if (state.firstFrame) {
+        state.firstFrame = false;
+        state.lastFrame = now;
+        state.raf = requestAnimationFrame(step);
+        return;
+      }
+      const dt = Math.max(0, Math.min(0.05, (now - state.lastFrame) / 1000));
+      state.lastFrame = now;
+      // Integrate
+      let a = acceleration();
+      state.v += a * dt;
+      // If friction would reverse motion past zero in one step, snap to zero
+      if (state.friction && Math.abs(state.F) <= state.muK * state.m * G + 1e-6 && Math.abs(state.v) < 0.05) {
+        state.v = 0;
+      }
+      state.x += state.v * dt;
+      state.t += dt;
+
+      // Stop conditions: hit wall at D, or out of range left
+      let stopped = false;
+      if (state.x >= state.D) { state.x = state.D; state.v = 0; stopped = true; }
+      if (state.x <= 0 && state.v < 0) { state.x = 0; state.v = 0; stopped = true; }
+      if (state.t >= state.T_MAX) { stopped = true; }
+
+      state.vHistory.push({ t: state.t, v: state.v });
+      // Keep history bounded
+      if (state.vHistory.length > 600) state.vHistory.shift();
+
+      render();
+
+      if (stopped) {
+        state.mode = "done";
+        $("play-btn").innerHTML = "▶ Play";
+        return;
+      }
+      state.raf = requestAnimationFrame(step);
+    }
+
+    function play() {
+      if (state.mode === "running") {
+        cancelAnimationFrame(state.raf);
+        state.mode = "paused";
+        $("play-btn").innerHTML = "▶ Resume";
+        return;
+      }
+      if (state.mode === "done") {
+        state.x = 0; state.v = 0; state.t = 0;
+        state.vHistory = [{ t: 0, v: 0 }];
+      }
+      state.mode = "running";
+      state.firstFrame = true;
+      $("play-btn").innerHTML = "⏸ Pause";
+      state.raf = requestAnimationFrame(step);
+    }
+    function reset() {
+      cancelAnimationFrame(state.raf);
+      state.mode = "ready";
+      state.x = 0; state.v = 0; state.t = 0;
+      state.vHistory = [{ t: 0, v: 0 }];
+      $("play-btn").innerHTML = "▶ Play";
+      render();
+    }
+
+    // ── Bindings ──
+    $("m-input").addEventListener("input", (e) => {
+      state.m = parseFloat(e.target.value);
+      render();
+    });
+    $("f-input").addEventListener("input", (e) => {
+      state.F = parseFloat(e.target.value);
+      render();
+    });
+    $("mu-input").addEventListener("input", (e) => {
+      state.muK = parseFloat(e.target.value);
+      render();
+    });
+    $("friction-toggle").addEventListener("click", () => {
+      state.friction = !state.friction;
+      $("friction-toggle").classList.toggle("on", state.friction);
+      $("friction-toggle").querySelector("span:first-child").textContent = state.friction ? "Friction on" : "Friction off";
+      render();
+    });
+    $("fbd-toggle").addEventListener("click", () => {
+      state.fbd = !state.fbd;
+      $("fbd-toggle").classList.toggle("on", state.fbd);
+      render();
+    });
+
+    function applyPreset(name) {
+      cancelAnimationFrame(state.raf);
+      state.mode = "ready"; state.t = 0; state.x = 0; state.v = 0;
+      state.vHistory = [{ t: 0, v: 0 }];
+      $("play-btn").innerHTML = "▶ Play";
+      if (name === "double-f") {
+        state.F = 16; state.m = 2; state.friction = true; state.muK = 0.2; state.ice = false;
+      } else if (name === "double-m") {
+        state.F = 8; state.m = 4; state.friction = true; state.muK = 0.2; state.ice = false;
+      } else if (name === "ice") {
+        state.F = 5; state.m = 2; state.friction = true; state.muK = 0.02; state.ice = true;
+      } else if (name === "stuck") {
+        state.F = 3; state.m = 4; state.friction = true; state.muK = 0.25; state.ice = false;
+      }
+      // Sync sliders
+      $("m-input").value = state.m;
+      $("f-input").value = state.F;
+      $("mu-input").value = state.muK;
+      $("friction-toggle").classList.toggle("on", state.friction);
+      $("friction-toggle").querySelector("span:first-child").textContent = state.friction ? "Friction on" : "Friction off";
+      render();
+    }
+    document.querySelectorAll("[data-preset]").forEach(btn => {
+      btn.addEventListener("click", () => applyPreset(btn.dataset.preset));
+    });
+
+    $("play-btn").addEventListener("click", play);
+    $("reset-btn").addEventListener("click", reset);
+
+    window.addEventListener("resize", render);
+
+    // ── Init ──
+    render();
+  </script>
+</body>
+</html>

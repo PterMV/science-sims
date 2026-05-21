@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Projectile Motion — Sim</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --surface-2: #f4f4f5;
+      --border: #e7e7ea;
+      --ink: #0a0a0a;
+      --ink-2: #3f3f46;
+      --ink-3: #71717a;
+      --ink-4: #a1a1aa;
+      --accent: oklch(0.52 0.16 262);
+      --accent-soft: oklch(0.96 0.025 262);
+      --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .sim {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      height: 100vh;
+      min-height: 600px;
+    }
+    @media (max-width: 760px) {
+      .sim {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(280px, 45vh) 1fr;
+        height: 100vh;
+        min-height: 0;
+      }
+      .panel {
+        border-left: none;
+        border-top: 1px solid var(--border);
+        padding: 18px 18px 22px;
+        gap: 16px;
+      }
+      .planet-row { grid-template-columns: repeat(4, 1fr); }
+    }
+    @media (max-height: 520px) and (orientation: landscape) {
+      .sim { grid-template-columns: 1fr 280px; grid-template-rows: 1fr; height: 100vh; min-height: 0; }
+      .panel { padding: 14px 16px; gap: 14px; }
+      .panel-header p { display: none; }
+    }
+    .stage {
+      position: relative;
+      background:
+        linear-gradient(180deg, #f8f8fa 0%, #f0f0f3 100%);
+      overflow: hidden;
+    }
+    .stage svg {
+      width: 100%; height: 100%;
+      display: block;
+    }
+    .grid line { stroke: rgba(0,0,0,0.04); }
+    .axis line { stroke: var(--ink-4); }
+    .axis text { fill: var(--ink-3); font-family: var(--mono); font-size: 10px; }
+    .ground { fill: #e7e7ea; }
+    .trail-bg { stroke: var(--ink-4); stroke-width: 1; fill: none; stroke-dasharray: 3 3; opacity: 0.5; }
+    .trail { stroke: var(--accent); stroke-width: 2; fill: none; }
+    .ball { fill: var(--accent); }
+    .ball-ghost { fill: var(--accent); opacity: 0.25; }
+    .cannon { fill: var(--ink); }
+    .vec-arrow { stroke: var(--accent); stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }
+    .vec-h { stroke: oklch(0.6 0.15 30); }
+    .vec-v { stroke: oklch(0.55 0.15 145); }
+
+    /* Side panel */
+    .panel {
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      overflow-y: auto;
+    }
+    .panel-header h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+    .panel-header p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--ink-3);
+      line-height: 1.5;
+    }
+    .ctrl-group { display: flex; flex-direction: column; gap: 14px; }
+    .ctrl-section-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-4);
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ctrl {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ctrl-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 12.5px;
+    }
+    .ctrl-label { color: var(--ink-2); }
+    .ctrl-value {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .ctrl-value .unit { color: var(--ink-3); margin-left: 2px; }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--surface-2);
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px; height: 16px;
+      background: var(--ink);
+      border-radius: 50%;
+      border: 2px solid var(--surface);
+      box-shadow: 0 0 0 1px var(--border);
+      cursor: grab;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 16px; height: 16px;
+      background: var(--ink);
+      border-radius: 50%;
+      border: 2px solid var(--surface);
+      box-shadow: 0 0 0 1px var(--border);
+    }
+
+    .toggle-row {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .toggle {
+      flex: 1;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: 6px 10px;
+      font-size: 11.5px;
+      border-radius: 6px;
+      color: var(--ink-3);
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .toggle.active { background: var(--ink); color: white; border-color: var(--ink); }
+
+    .planet-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+    .btn {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .btn.primary {
+      background: var(--ink);
+      color: white;
+      border-color: var(--ink);
+    }
+    .btn:hover { background: var(--surface-2); }
+    .btn.primary:hover { background: var(--ink-2); }
+
+    /* Readouts */
+    .readouts {
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 16px;
+    }
+    .readout-label {
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin-bottom: 2px;
+    }
+    .readout-value {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+    .readout-value .unit {
+      font-weight: 400;
+      color: var(--ink-3);
+      font-size: 11px;
+      margin-left: 2px;
+    }
+
+    /* HUD overlay on stage */
+    .hud {
+      position: absolute;
+      top: 14px; left: 14px;
+      display: flex;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--ink-3);
+    }
+    .hud-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .legend {
+      position: absolute;
+      bottom: 14px; left: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--ink-3);
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(4px);
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .legend-row { display: flex; align-items: center; gap: 6px; }
+    .legend-swatch { width: 10px; height: 2px; border-radius: 999px; }
+  </style>
+</head>
+<body>
+  <div class="sim">
+    <div class="stage" id="stage">
+      <svg id="canvas" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" />
+          </marker>
+        </defs>
+        <g class="grid" id="grid"></g>
+        <g class="axis" id="axis"></g>
+        <rect class="ground" id="ground" />
+        <path class="trail-bg" id="trail-bg" />
+        <path class="trail" id="trail" />
+        <g id="ghosts"></g>
+        <g id="cannon"></g>
+        <circle class="ball" id="ball" r="6" />
+        <g id="vectors"></g>
+      </svg>
+      <div class="hud">
+        <span class="hud-chip" id="hud-state">Ready</span>
+        <span class="hud-chip" id="hud-time">t = 0.00 s</span>
+      </div>
+      <div class="legend">
+        <div class="legend-row"><span class="legend-swatch" style="background: oklch(0.52 0.16 262)"></span> Velocity</div>
+        <div class="legend-row"><span class="legend-swatch" style="background: oklch(0.6 0.15 30)"></span> Horizontal component</div>
+        <div class="legend-row"><span class="legend-swatch" style="background: oklch(0.55 0.15 145)"></span> Vertical component</div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-header">
+        <h2>Projectile Motion</h2>
+        <p>Launch a projectile, vary the parameters and trace its path. Air drag and gravity adjust the trajectory live.</p>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-section-label">Launch</div>
+
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Initial velocity</span>
+            <span class="ctrl-value"><span id="v-out">35</span><span class="unit">m/s</span></span>
+          </div>
+          <input type="range" id="v-input" min="5" max="80" step="1" value="35" />
+        </div>
+
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Launch angle</span>
+            <span class="ctrl-value"><span id="angle-out">45</span><span class="unit">°</span></span>
+          </div>
+          <input type="range" id="angle-input" min="5" max="85" step="1" value="45" />
+        </div>
+
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Launch height</span>
+            <span class="ctrl-value"><span id="h-out">0</span><span class="unit">m</span></span>
+          </div>
+          <input type="range" id="h-input" min="0" max="30" step="1" value="0" />
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-section-label">Environment</div>
+
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Gravity</span>
+            <span class="ctrl-value"><span id="g-out">9.81</span><span class="unit">m/s²</span></span>
+          </div>
+          <div class="planet-row">
+            <button class="toggle active" data-g="9.81">Earth</button>
+            <button class="toggle" data-g="1.62">Moon</button>
+            <button class="toggle" data-g="3.71">Mars</button>
+            <button class="toggle" data-g="24.79">Jupiter</button>
+          </div>
+        </div>
+
+        <div class="ctrl">
+          <div class="ctrl-head">
+            <span class="ctrl-label">Air drag</span>
+            <span class="ctrl-value"><span id="drag-out">0.00</span></span>
+          </div>
+          <input type="range" id="drag-input" min="0" max="0.3" step="0.01" value="0" />
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-section-label">Display</div>
+        <div class="toggle-row">
+          <button class="toggle active" id="t-vectors">Vectors</button>
+          <button class="toggle active" id="t-trail">Trail</button>
+          <button class="toggle" id="t-ghosts">Stroboscope</button>
+        </div>
+      </div>
+
+      <div class="readouts">
+        <div>
+          <div class="readout-label">Range</div>
+          <div class="readout-value"><span id="r-range">0</span><span class="unit">m</span></div>
+        </div>
+        <div>
+          <div class="readout-label">Max height</div>
+          <div class="readout-value"><span id="r-hmax">0</span><span class="unit">m</span></div>
+        </div>
+        <div>
+          <div class="readout-label">Flight time</div>
+          <div class="readout-value"><span id="r-tflight">0</span><span class="unit">s</span></div>
+        </div>
+        <div>
+          <div class="readout-label">Impact speed</div>
+          <div class="readout-value"><span id="r-vimp">0</span><span class="unit">m/s</span></div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" id="launch-btn">Launch</button>
+        <button class="btn" id="reset-btn">Reset</button>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ── Constants ──────────────────────────────────────────────
+    const W = 800, H = 500;
+    const PADDING = { l: 40, r: 20, t: 30, b: 50 };
+    const PLOT_W = W - PADDING.l - PADDING.r;
+    const PLOT_H = H - PADDING.t - PADDING.b;
+    const GROUND_Y = H - PADDING.b;
+
+    // Scale: world-meters → svg-pixels. Calibrated so a reasonable shot fits.
+    const M_PER_SVG = 1.5; // 1 svg-px = 1.5/svg-pixel? Let's instead just use unit-based: we'll scale dynamically.
+
+    // ── State ─────────────────────────────────────────────────
+    const state = {
+      v0: 35, angle: 45, h0: 0, g: 9.81, drag: 0,
+      mode: "ready", // ready | running | done
+      t: 0, x: 0, y: 0, vx: 0, vy: 0,
+      trail: [],
+      ghosts: [],
+      ghostInterval: 0.2,
+      lastGhostT: 0,
+      showVectors: true,
+      showTrail: true,
+      showGhosts: false,
+      raf: null,
+      lastFrame: 0,
+      scale: 6, // pixels per meter, recalculated per launch
+      stats: { range: 0, hmax: 0, tflight: 0, vimp: 0 },
+    };
+
+    // ── DOM refs ──────────────────────────────────────────────
+    const $ = (id) => document.getElementById(id);
+    const svg = $("canvas");
+    const ball = $("ball");
+    const trailEl = $("trail");
+    const trailBgEl = $("trail-bg");
+    const ghostsG = $("ghosts");
+    const vectorsG = $("vectors");
+    const cannonG = $("cannon");
+    const groundEl = $("ground");
+    const gridG = $("grid");
+    const axisG = $("axis");
+
+    groundEl.setAttribute("x", 0);
+    groundEl.setAttribute("y", GROUND_Y);
+    groundEl.setAttribute("width", W);
+    groundEl.setAttribute("height", H - GROUND_Y);
+
+    // ── Predict trajectory (no drag for fast preview) ─────────
+    function predictNoDrag(v0, ang, h0, g) {
+      const rad = ang * Math.PI / 180;
+      const vx = v0 * Math.cos(rad);
+      const vy = v0 * Math.sin(rad);
+      // Time of flight: solve h0 + vy*t - 0.5*g*t^2 = 0
+      const disc = vy * vy + 2 * g * h0;
+      const tflight = (vy + Math.sqrt(disc)) / g;
+      const range = vx * tflight;
+      const hmax = h0 + (vy * vy) / (2 * g);
+      // Sample points
+      const pts = [];
+      const N = 100;
+      for (let i = 0; i <= N; i++) {
+        const t = (i / N) * tflight;
+        pts.push({ x: vx * t, y: h0 + vy * t - 0.5 * g * t * t, t });
+      }
+      const vimp = Math.sqrt(vx * vx + (vy - g * tflight) ** 2);
+      return { pts, tflight, range, hmax, vimp };
+    }
+
+    // ── Predict with drag (numerical) ─────────────────────────
+    function predictWithDrag(v0, ang, h0, g, drag) {
+      const rad = ang * Math.PI / 180;
+      let x = 0, y = h0;
+      let vx = v0 * Math.cos(rad);
+      let vy = v0 * Math.sin(rad);
+      const dt = 0.005;
+      const pts = [{ x, y, t: 0 }];
+      let t = 0;
+      let hmax = h0;
+      while (y >= 0 && t < 60) {
+        const v = Math.hypot(vx, vy);
+        const ax = -drag * v * vx;
+        const ay = -g - drag * v * vy;
+        vx += ax * dt;
+        vy += ay * dt;
+        x += vx * dt;
+        y += vy * dt;
+        t += dt;
+        if (y > hmax) hmax = y;
+        pts.push({ x, y, t });
+      }
+      const vimp = Math.hypot(vx, vy);
+      // interpolate touching y=0
+      if (pts.length >= 2) {
+        const a = pts[pts.length - 2], b = pts[pts.length - 1];
+        if (a.y > 0 && b.y < 0) {
+          const k = a.y / (a.y - b.y);
+          b.x = a.x + (b.x - a.x) * k;
+          b.y = 0;
+          b.t = a.t + (b.t - a.t) * k;
+        }
+      }
+      const tail = pts[pts.length - 1];
+      return { pts, tflight: tail.t, range: tail.x, hmax, vimp };
+    }
+
+    function predict() {
+      return state.drag > 0
+        ? predictWithDrag(state.v0, state.angle, state.h0, state.g, state.drag)
+        : predictNoDrag(state.v0, state.angle, state.h0, state.g);
+    }
+
+    // ── Scale + transform ─────────────────────────────────────
+    function computeScale(preview) {
+      const xMax = Math.max(preview.range, 5);
+      const yMax = Math.max(preview.hmax, 3);
+      const sx = PLOT_W / (xMax * 1.15);
+      const sy = PLOT_H / (yMax * 1.25);
+      state.scale = Math.min(sx, sy);
+    }
+
+    // world (x_meters, y_meters) → svg coords
+    function w2s(x, y) {
+      return [PADDING.l + x * state.scale, GROUND_Y - y * state.scale];
+    }
+
+    // ── Draw axes + grid ──────────────────────────────────────
+    function drawAxes(preview) {
+      gridG.innerHTML = "";
+      axisG.innerHTML = "";
+      const xMax = Math.max(preview.range, 5);
+      const yMax = Math.max(preview.hmax + 2, 3);
+
+      // X gridlines / labels
+      const xStep = niceStep(xMax, 6);
+      for (let x = 0; x <= xMax + xStep * 0.5; x += xStep) {
+        const [sx, sy] = w2s(x, 0);
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", sx); line.setAttribute("x2", sx);
+        line.setAttribute("y1", PADDING.t); line.setAttribute("y2", GROUND_Y);
+        gridG.appendChild(line);
+        const lbl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        lbl.setAttribute("x", sx); lbl.setAttribute("y", GROUND_Y + 14);
+        lbl.setAttribute("text-anchor", "middle");
+        lbl.textContent = x.toFixed(x < 10 ? 0 : 0) + "m";
+        axisG.appendChild(lbl);
+      }
+      // Y gridlines / labels
+      const yStep = niceStep(yMax, 5);
+      for (let y = 0; y <= yMax + yStep * 0.5; y += yStep) {
+        const [sx, sy] = w2s(0, y);
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", PADDING.l); line.setAttribute("x2", W - PADDING.r);
+        line.setAttribute("y1", sy); line.setAttribute("y2", sy);
+        gridG.appendChild(line);
+        const lbl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        lbl.setAttribute("x", PADDING.l - 6); lbl.setAttribute("y", sy + 3);
+        lbl.setAttribute("text-anchor", "end");
+        lbl.textContent = y.toFixed(0) + "m";
+        axisG.appendChild(lbl);
+      }
+    }
+
+    function niceStep(range, target) {
+      const raw = range / target;
+      const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+      const norm = raw / pow;
+      const step = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+      return step * pow;
+    }
+
+    // ── Cannon ────────────────────────────────────────────────
+    function drawCannon() {
+      cannonG.innerHTML = "";
+      const [sx, sy] = w2s(0, state.h0);
+      const rad = state.angle * Math.PI / 180;
+      const L = 24;
+      const ex = sx + L * Math.cos(rad);
+      const ey = sy - L * Math.sin(rad);
+
+      // base
+      const base = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      base.setAttribute("x", sx - 12);
+      base.setAttribute("y", sy);
+      base.setAttribute("width", 24);
+      base.setAttribute("height", Math.max(6, GROUND_Y - sy));
+      base.setAttribute("fill", "var(--ink)");
+      cannonG.appendChild(base);
+
+      // barrel
+      const barrel = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      barrel.setAttribute("x1", sx); barrel.setAttribute("y1", sy);
+      barrel.setAttribute("x2", ex); barrel.setAttribute("y2", ey);
+      barrel.setAttribute("stroke", "var(--ink)");
+      barrel.setAttribute("stroke-width", "8");
+      barrel.setAttribute("stroke-linecap", "round");
+      cannonG.appendChild(barrel);
+    }
+
+    // ── Trail / ghosts ────────────────────────────────────────
+    function pathFromPts(pts) {
+      if (!pts.length) return "";
+      return pts.map((p, i) => {
+        const [sx, sy] = w2s(p.x, p.y);
+        return (i === 0 ? "M" : "L") + sx.toFixed(1) + " " + sy.toFixed(1);
+      }).join(" ");
+    }
+
+    function drawPreview() {
+      const pred = predict();
+      computeScale(pred);
+      drawAxes(pred);
+      drawCannon();
+      trailBgEl.setAttribute("d", state.showTrail ? pathFromPts(pred.pts) : "");
+      trailEl.setAttribute("d", "");
+      const [bx, by] = w2s(0, state.h0);
+      ball.setAttribute("cx", bx); ball.setAttribute("cy", by);
+      drawVectors(0, state.h0, state.v0 * Math.cos(state.angle * Math.PI / 180), state.v0 * Math.sin(state.angle * Math.PI / 180));
+      // store stats for preview
+      state.stats = { range: pred.range, hmax: pred.hmax, tflight: pred.tflight, vimp: pred.vimp };
+      updateReadouts();
+    }
+
+    function drawVectors(x, y, vx, vy) {
+      vectorsG.innerHTML = "";
+      if (!state.showVectors) return;
+      const [sx, sy] = w2s(x, y);
+      // Scale: 1 m/s = 2 px
+      const k = 2;
+      const v = Math.hypot(vx, vy);
+      if (v < 0.5) return;
+      // resultant
+      const r = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      r.setAttribute("x1", sx); r.setAttribute("y1", sy);
+      r.setAttribute("x2", sx + vx * k);
+      r.setAttribute("y2", sy - vy * k);
+      r.setAttribute("class", "vec-arrow");
+      r.setAttribute("color", "oklch(0.52 0.16 262)");
+      vectorsG.appendChild(r);
+      // horizontal
+      const h = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      h.setAttribute("x1", sx); h.setAttribute("y1", sy);
+      h.setAttribute("x2", sx + vx * k); h.setAttribute("y2", sy);
+      h.setAttribute("class", "vec-arrow vec-h");
+      h.setAttribute("color", "oklch(0.6 0.15 30)");
+      vectorsG.appendChild(h);
+      // vertical
+      const vEl = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      vEl.setAttribute("x1", sx); vEl.setAttribute("y1", sy);
+      vEl.setAttribute("x2", sx); vEl.setAttribute("y2", sy - vy * k);
+      vEl.setAttribute("class", "vec-arrow vec-v");
+      vEl.setAttribute("color", "oklch(0.55 0.15 145)");
+      vectorsG.appendChild(vEl);
+    }
+
+    // ── Animation loop ────────────────────────────────────────
+    function step(now) {
+      if (state.mode !== "running") return;
+      // First frame: just sync the clock, don't integrate (avoids 0-dt or
+      // tiny-negative-dt edge cases that can land a y=0 launch on frame 1).
+      if (state.firstFrame) {
+        state.firstFrame = false;
+        state.lastFrame = now;
+        state.raf = requestAnimationFrame(step);
+        return;
+      }
+      const dt = Math.max(0, Math.min(0.04, (now - state.lastFrame) / 1000));
+      state.lastFrame = now;
+      if (dt === 0) {
+        state.raf = requestAnimationFrame(step);
+        return;
+      }
+      // physics step (substep for accuracy)
+      const steps = 4;
+      const h = dt / steps;
+      for (let i = 0; i < steps; i++) {
+        const v = Math.hypot(state.vx, state.vy);
+        const ax = -state.drag * v * state.vx;
+        const ay = -state.g - state.drag * v * state.vy;
+        state.vx += ax * h;
+        state.vy += ay * h;
+        state.x += state.vx * h;
+        state.y += state.vy * h;
+        state.t += h;
+        // Only consider "landed" once meaningful time has elapsed — guards
+        // against a y=0 launch immediately tripping the ground check.
+        if (state.y <= 0 && state.t > 0.02) {
+          state.y = 0;
+          state.mode = "done";
+          $("hud-state").textContent = "Landed";
+          break;
+        }
+      }
+
+      // Stroboscope
+      if (state.showGhosts && state.t - state.lastGhostT >= state.ghostInterval) {
+        state.ghosts.push({ x: state.x, y: state.y });
+        state.lastGhostT = state.t;
+        renderGhosts();
+      }
+
+      state.trail.push({ x: state.x, y: state.y });
+      if (state.showTrail) trailEl.setAttribute("d", pathFromPts(state.trail));
+      const [sx, sy] = w2s(state.x, state.y);
+      ball.setAttribute("cx", sx); ball.setAttribute("cy", sy);
+      drawVectors(state.x, state.y, state.vx, state.vy);
+      $("hud-time").textContent = "t = " + state.t.toFixed(2) + " s";
+
+      if (state.mode === "running") {
+        state.raf = requestAnimationFrame(step);
+      } else {
+        // final readouts
+        state.stats.tflight = state.t;
+        state.stats.range = state.x;
+        state.stats.vimp = Math.hypot(state.vx, state.vy);
+        state.stats.hmax = Math.max(state.stats.hmax, ...state.trail.map(p => p.y));
+        updateReadouts();
+      }
+    }
+
+    function renderGhosts() {
+      ghostsG.innerHTML = "";
+      for (const g of state.ghosts) {
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        const [sx, sy] = w2s(g.x, g.y);
+        c.setAttribute("cx", sx); c.setAttribute("cy", sy);
+        c.setAttribute("r", 4);
+        c.setAttribute("class", "ball-ghost");
+        ghostsG.appendChild(c);
+      }
+    }
+
+    function launch() {
+      // reset trails
+      state.trail = []; state.ghosts = []; state.lastGhostT = 0;
+      ghostsG.innerHTML = "";
+      trailEl.setAttribute("d", "");
+      // pre-compute scale from prediction
+      const pred = predict();
+      computeScale(pred);
+      drawAxes(pred);
+      drawCannon();
+      trailBgEl.setAttribute("d", state.showTrail ? pathFromPts(pred.pts) : "");
+      // initial state
+      const rad = state.angle * Math.PI / 180;
+      state.x = 0;
+      state.y = state.h0;
+      state.vx = state.v0 * Math.cos(rad);
+      state.vy = state.v0 * Math.sin(rad);
+      state.t = 0;
+      state.mode = "running";
+      state.firstFrame = true;
+      state.lastFrame = performance.now();
+      $("hud-state").textContent = "Flying";
+      state.raf = requestAnimationFrame(step);
+    }
+
+    function reset() {
+      cancelAnimationFrame(state.raf);
+      state.mode = "ready";
+      state.trail = []; state.ghosts = [];
+      ghostsG.innerHTML = "";
+      $("hud-state").textContent = "Ready";
+      $("hud-time").textContent = "t = 0.00 s";
+      drawPreview();
+    }
+
+    function updateReadouts() {
+      $("r-range").textContent = state.stats.range.toFixed(1);
+      $("r-hmax").textContent = state.stats.hmax.toFixed(1);
+      $("r-tflight").textContent = state.stats.tflight.toFixed(2);
+      $("r-vimp").textContent = state.stats.vimp.toFixed(1);
+    }
+
+    // ── Bindings ──────────────────────────────────────────────
+    function bindSlider(id, outId, key, fixed = 0) {
+      const el = $(id), out = $(outId);
+      el.addEventListener("input", () => {
+        state[key] = parseFloat(el.value);
+        out.textContent = fixed ? state[key].toFixed(fixed) : state[key];
+        if (state.mode !== "running") drawPreview();
+      });
+    }
+    bindSlider("v-input", "v-out", "v0");
+    bindSlider("angle-input", "angle-out", "angle");
+    bindSlider("h-input", "h-out", "h0");
+    bindSlider("drag-input", "drag-out", "drag", 2);
+
+    document.querySelectorAll(".planet-row .toggle").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".planet-row .toggle").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.g = parseFloat(btn.dataset.g);
+        $("g-out").textContent = state.g.toFixed(2);
+        if (state.mode !== "running") drawPreview();
+      });
+    });
+
+    function bindToggle(id, key) {
+      $(id).addEventListener("click", () => {
+        state[key] = !state[key];
+        $(id).classList.toggle("active", state[key]);
+        if (state.mode !== "running") drawPreview();
+        if (key === "showGhosts" && !state.showGhosts) {
+          state.ghosts = [];
+          ghostsG.innerHTML = "";
+        }
+        if (key === "showVectors" && !state.showVectors) vectorsG.innerHTML = "";
+        if (key === "showTrail" && !state.showTrail) {
+          trailEl.setAttribute("d", "");
+          trailBgEl.setAttribute("d", "");
+        }
+      });
+    }
+    bindToggle("t-vectors", "showVectors");
+    bindToggle("t-trail", "showTrail");
+    bindToggle("t-ghosts", "showGhosts");
+
+    $("launch-btn").addEventListener("click", launch);
+    $("reset-btn").addEventListener("click", reset);
+
+    // Initial render
+    drawPreview();
+  </script>
+</body>
+</html>
